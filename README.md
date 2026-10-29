@@ -26,14 +26,26 @@ curl localhost:8000/health
 uv run chaos.py list
 uv run chaos.py 1        # redis down
 uv run chaos.py 2        # bad DB password after "deploy"
+uv run chaos.py 3        # worker memory leak
+uv run chaos.py 4        # disk fill (api scratch volume)
+uv run chaos.py 5        # redis down + DB connection exhaustion (two root causes)
 
 # 2+3. or let the runner inject a fault and recover, with a live timeline
 uv run python -m agent.run --scenario 1
 uv run python -m agent.run --scenario 2 --auto-approve       # skip the y/n for high-risk actions
 uv run python -m agent.run --scenario 1 --mode big-only      # hybrid | big-only | small-only
 
+uv run python -m agent.run --scenario 5 --auto-approve       # main demo: two simultaneous faults
+
 # reports land in reports/, learned runbooks in runbooks/
 uv run chaos.py reset
+```
+
+## Benchmark
+```bash
+uv run python -m benchmarks.run              # 5 scenarios × 3 modes × cold/warm × 3 reps, resumable
+uv run python -m benchmarks.run --n 1 --scenarios 5 --modes hybrid
+uv run python -m benchmarks.run --report-only   # re-render benchmarks/results.md from results.csv
 ```
 
 ## Checks

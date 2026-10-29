@@ -7,3 +7,5 @@ demo/config/*.prev
 .DS_Store
 reports/
 .state/
+benchmarks/logs/
+benchmarks/telemetry.db

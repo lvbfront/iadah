@@ -238,6 +238,16 @@ def _resolve_roots(inc: Incident):
     inc.root_service = roots[0]["service"]
 
 
+def _drop_symptom_roots(inc: Incident, d: dict | None):
+    """A service failing only because a dependency failed is a symptom, never a root cause."""
+    if d and inc.symptoms:
+        keep = [rc for rc in d.get("root_causes", []) if rc["service"] not in inc.symptoms]
+        if len(keep) < len(d.get("root_causes", [])):
+            telemetry.log_step(inc.id, "route", note=f"dropped symptom roots on {inc.symptoms} (topology)")
+            d["root_causes"] = keep
+    return d
+
+
 def triage(inc: Incident, obs):
     services = sorted(inc.health)
     prompt = S.TRIAGE_PROMPT.format(
@@ -250,7 +260,7 @@ def triage(inc: Incident, obs):
                        lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                  f"conf={d['confidence']:.2f} sev={d['severity']}",
                        check=lambda d: 0 <= d["confidence"] <= 1)
-    inc.triage = data or {"incident_type": "unknown", "severity": "high", "affected_services": list(inc.unhealthy),
+    inc.triage = _drop_symptom_roots(inc, data) or {"incident_type": "unknown", "severity": "high", "affected_services": list(inc.unhealthy),
                           "suspected_root_cause": "triage failed", "confidence": 0.0,
                           "root_cause_service": (inc.suspects or services)[0], "root_causes": [], "evidence": []}
 
@@ -311,7 +321,7 @@ def diagnose(inc: Incident, obs):
                            lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                      f"conf={d['confidence']:.2f} — {d['suspected_root_cause'][:80]} "
                                      f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok)
-    inc.diagnosis = d or inc.triage | {"hypotheses": []}
+    inc.diagnosis = _drop_symptom_roots(inc, d) or inc.triage | {"hypotheses": []}
     _resolve_roots(inc)
 
 
