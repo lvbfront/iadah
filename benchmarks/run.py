@@ -24,14 +24,18 @@ import config
 OUT = Path(__file__).parent
 RESULTS = OUT / "results.csv"
 FIELDS = ["key", "scenario", "mode", "condition", "rep", "incident", "resolved", "diag_correct", "diagnosed",
-          "mttd_s", "mttr_s", "iterations", "escalations", "tokens", "big_tokens", "cost_usd", "error"]
+          "mttd_s", "mttr_s", "iterations", "escalations", "tokens", "big_tokens", "cost_usd", "sleep_gap_s",
+          "invalid", "error"]
+SLEEP_GAP_LIMIT_S = 60  # wall clock ahead of the monotonic clock by more than this = machine slept → rerun
+MAX_ATTEMPTS = 3
 
 
 def done_keys() -> set[str]:
+    """Keys with a valid row; invalid (slept) rows don't count, so they're rerun on resume."""
     if not RESULTS.exists():
         return set()
     with RESULTS.open() as f:
-        return {r["key"] for r in csv.DictReader(f)}
+        return {r["key"] for r in csv.DictReader(f) if r["invalid"] != "1"}
 
 
 def append(row: dict):
@@ -61,6 +65,8 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
     config.RUNBOOKS_DIR = runbook_dir(condition)
     log = (OUT / "logs" / f"{key}.log").open("w")
     telemetry.console.file = log
+    # macOS: perf_counter stops while the machine sleeps, time.time() doesn't → the difference is sleep time
+    wall0, mono0 = time.time(), time.perf_counter()
     try:
         inc = run(scenario)
         tot = telemetry.totals(inc.id)
@@ -78,6 +84,8 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
         traceback.print_exc(file=log)
         row |= {"resolved": 0, "diag_correct": 0, "error": f"{type(e).__name__}: {e}"[:200]}
     finally:
+        gap = (time.time() - wall0) - (time.perf_counter() - mono0)
+        row |= {"sleep_gap_s": round(gap, 1), "invalid": int(gap > SLEEP_GAP_LIMIT_S)}
         telemetry.console.file = None  # back to stdout
         log.close()
         shutil.rmtree(config.RUNBOOKS_DIR, ignore_errors=True)
@@ -96,7 +104,9 @@ def pct(xs):
 
 def report():
     with RESULTS.open() as f:
-        rows = list(csv.DictReader(f))
+        allrows = list(csv.DictReader(f))
+    rows = [r for r in allrows if r["invalid"] != "1"]
+    invalid = len(allrows) - len(rows)
     groups: dict[tuple, list] = {}
     for r in rows:
         groups.setdefault((r["scenario"], r["mode"], r["condition"]), []).append(r)
@@ -120,7 +130,7 @@ def report():
     fails = [r for r in rows if r["mode"] == "small-only" and (r["resolved"] != "1" or r["diag_correct"] != "1")]
 
     md = ["# Benchmark results", "",
-          f"{len(rows)} runs. Ground truth = `chaos.TRUTH`. MTTR averages resolved runs only. "
+          f"{len(rows)} valid runs ({invalid} discarded: machine slept > {SLEEP_GAP_LIMIT_S}s mid-run, rerun). Ground truth = `chaos.TRUTH`. MTTR averages resolved runs only. "
           "cold = no runbooks, warm = seed runbooks (none for scenario 5).", "",
           "## By mode × condition", "",
           "| mode | condition | runs | diag accuracy | recovered | MTTR s | escalations | cost/run $ | total $ |",
@@ -161,8 +171,13 @@ if __name__ == "__main__":
         print(f"{len(todo)} runs to do ({len(skip)} already done)")
         for n, (s, m, c, i) in enumerate(todo, 1):
             t = time.time()
-            row = one(s, m, c, i)
-            append(row)
+            for attempt in range(1, MAX_ATTEMPTS + 1):
+                row = one(s, m, c, i)
+                append(row)
+                if not row["invalid"]:
+                    break
+                print(f"  {row['key']}: machine slept {row['sleep_gap_s']}s mid-run → invalid, rerunning "
+                      f"({attempt}/{MAX_ATTEMPTS})", flush=True)
             print(f"[{n}/{len(todo)}] {row['key']}: resolved={row.get('resolved')} diag={row.get('diag_correct')} "
                   f"({row.get('diagnosed', '')}) mttr={row.get('mttr_s', '')} ${row.get('cost_usd', '')} "
                   f"{time.time() - t:.0f}s {row['error']}", flush=True)
