@@ -19,6 +19,7 @@ inject → detect (rules, polled) → compress (drain3) → triage (small)
 - **Verify**: all containers healthy AND the api's 10s-window error rate ≤ baseline+0.05 and latency ≤ max(3×, +50ms), polled up to 45s.
 - **Telemetry**: `steps` (tier, requested_model, model actually answering, tokens, latency, cost, note) and `incidents` (MTTD, MTTR, raw vs compressed log tokens, escalations, cost). MTTD/MTTR are measured from when the chaos call returns.
 - **Log windows** start 15s before injection, so leftover logs from earlier incidents don't pollute the evidence.
+
 The agent never touches Docker directly. It goes through `adapters/base.py` (`Observability`, `Actions`), so K8s, Prometheus, or ELK adapters can be added later without changing the agent.
 
 ## Layout
@@ -42,7 +43,7 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
 ## Conventions
 - The agent runs on the host. Ollama runs natively on `localhost:11434` (containers would use `host.docker.internal:11434`).
 - Each module has a `__main__` self-check where useful (`python -m router.rules`, `-m llm.backends`, `-m adapters.docker_adapter`).
-- Stages mutate `Incident` and call `telemetry.log_step` exactly once.
+- Stages mutate `Incident`. Every LLM call and every decision goes through `telemetry.log_step`, which also prints the live timeline row.
 - `.env` is gitignored. Never commit keys.
 - The demo api reads `/config/app.env` (a mounted file), so a "bad deploy" is a config edit plus a restart. chaos saves the previous version to `app.env.prev`.
 
