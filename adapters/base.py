@@ -12,7 +12,8 @@ class Observability(ABC):
 
     @abstractmethod
     def get_health(self) -> dict[str, dict]:
-        """{service: {"status": "healthy"|"unhealthy"|"down"|..., ...}}"""
+        """{service: {"status": "healthy"|"unhealthy"|"down"|"starting"|"running",
+                      "app": {"error_rate", "avg_latency_ms", ...} if the service exposes metrics}}"""
 
     @abstractmethod
     def get_topology(self) -> dict[str, list[str]]:
@@ -20,14 +21,25 @@ class Observability(ABC):
 
 
 class Actions(ABC):
-    @abstractmethod
-    def restart(self, service: str) -> str: ...
+    """Every action returns a record {"action", "service", "detail", "undo": {...} | None}
+    that undo() can reverse."""
 
     @abstractmethod
-    def rollback_config(self, service: str) -> str: ...
+    def restart(self, service: str) -> dict: ...
 
     @abstractmethod
-    def scale(self, service: str, replicas: int) -> str: ...
+    def rollback_config(self, service: str) -> dict:
+        """Restore the service's last-known-good config and restart it."""
 
     @abstractmethod
-    def clear_disk(self, service: str, path: str) -> str: ...
+    def mark_known_good(self, service: str) -> None:
+        """Record the service's current config as last-known-good (call when verified healthy)."""
+
+    @abstractmethod
+    def undo(self, record: dict) -> dict: ...
+
+    @abstractmethod
+    def scale(self, service: str, replicas: int) -> dict: ...
+
+    @abstractmethod
+    def clear_disk(self, service: str, path: str) -> dict: ...

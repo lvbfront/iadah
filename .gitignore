@@ -5,3 +5,5 @@ __pycache__/
 telemetry.db
 demo/config/*.prev
 .DS_Store
+reports/
+.state/

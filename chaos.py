@@ -10,7 +10,7 @@ PREV = CFG.with_suffix(".env.prev")  # what a rollback restores
 
 
 def compose(*args):
-    subprocess.run(["docker", "compose", "-f", str(DEMO / "docker-compose.yml"), *args], check=True)
+    subprocess.run(["docker", "compose", "-f", str(DEMO / "docker-compose.yml"), *args], check=True, capture_output=True)
 
 
 def redis_down():

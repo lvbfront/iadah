@@ -10,18 +10,26 @@ BIG_MODEL = os.getenv("BIG_MODEL", "claude-sonnet-5-5")
 
 # Compose project the DockerAdapter watches.
 TARGET_PROJECT = os.getenv("TARGET_PROJECT", "demo")
-API_URL = os.getenv("API_URL", "http://localhost:8000")
+STATE_DIR = os.getenv("STATE_DIR", ".state")  # last-known-good configs etc.
 
 # USD per 1M tokens (input, output). Local models are free.
+# Includes the server-side fallback targets so a fallback answer is priced correctly.
 PRICING = {
     "claude-sonnet-5-5": (2.00, 10.00),
     "claude-opus-5-5": (4.00, 20.00),
+    "claude-opus-4-8": (5.00, 25.00),
 }
 
 TELEMETRY_DB = os.getenv("TELEMETRY_DB", "telemetry.db")
 MAX_VERIFY_ITERATIONS = 3
+INVESTIGATE_BUDGET = 5      # tool calls per iteration
+VERIFY_TIMEOUT_S = 45
+
+# Set by the CLI runner.
+MODE = "hybrid"             # hybrid | big-only | small-only
+AUTO_APPROVE = False
 
 
-def cost(model: str, in_tok: int, out_tok: int) -> float:
-    pin, pout = PRICING.get(model, (0.0, 0.0))
+def cost(model: str, in_tok: int, out_tok: int, fallback_model: str = "") -> float:
+    pin, pout = PRICING.get(model) or PRICING.get(fallback_model, (0.0, 0.0))
     return (in_tok * pin + out_tok * pout) / 1_000_000
