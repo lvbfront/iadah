@@ -86,6 +86,7 @@ def reset():
 
 
 SCENARIOS = {
+    "0": ("no fault (control): healthy system, normal traffic", lambda: None),
     "1": ("redis down", redis_down),
     "2": ("bad DB password after deploy", bad_db_password),
     "3": ("worker memory leak", worker_memory_leak),
@@ -100,6 +101,7 @@ SCENARIOS = {
 # type in the vocabulary, and we deliberately did not add one. It is graded on locating the root at the api
 # (the cache itself is healthy; any real fix must target the api's config).
 TRUTH = {
+    "0": set(),  # control: nothing should be detected or touched
     "1": {("cache_down", "cache")},
     "2": {("db_auth_failure", "api")},
     "3": {("memory_leak", "worker")},

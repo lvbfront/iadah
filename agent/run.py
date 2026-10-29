@@ -67,9 +67,10 @@ def run(scenario: str | None, adapter=None) -> Incident:
         telemetry.log_step(inc.id, "inject", note=f"chaos scenario {scenario}: {desc}")
 
     # detect: poll rules until something is wrong
+    window = config.CONTROL_WINDOW_S if scenario == "0" else config.DETECT_WINDOW_S
     while not stages.detect(inc, adapter, log=False):
-        if not scenario or time.time() - inc.injected_at > 90:
-            console.print("[green]system healthy, nothing to do[/]")
+        if not scenario or time.time() - inc.injected_at > window:
+            telemetry.log_step(inc.id, "detect", note=f"[green]no alert in {window}s[/]: system healthy, nothing to do")
             return inc
         time.sleep(1)
     inc.detected_at = time.time()
