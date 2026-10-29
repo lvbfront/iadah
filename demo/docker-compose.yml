@@ -1,0 +1,57 @@
+# Demo target system. Total memory limits ~1.2GB.
+# recovery.depends_on labels give the agent the service dependency graph.
+name: demo
+
+x-app: &app
+  build: ./app
+  volumes: ["./config:/config"]
+  restart: "no"
+
+services:
+  api:
+    <<: *app
+    ports: ["8000:8000"]
+    mem_limit: 256m
+    labels: {recovery.depends_on: "db,cache"}
+    depends_on: {db: {condition: service_healthy}, cache: {condition: service_started}}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]
+      interval: 5s
+      timeout: 3s
+      retries: 2
+
+  worker:
+    <<: *app
+    command: ["python", "worker.py"]
+    mem_limit: 256m
+    labels: {recovery.depends_on: "db,cache"}
+    depends_on: {db: {condition: service_healthy}, cache: {condition: service_started}}
+
+  db:
+    image: postgres:16-alpine
+    environment: {POSTGRES_DB: app, POSTGRES_USER: app, POSTGRES_PASSWORD: app}
+    volumes: ["./db-init.sql:/docker-entrypoint-initdb.d/init.sql:ro"]
+    mem_limit: 512m
+    labels: {recovery.depends_on: ""}
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "app"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  cache:
+    image: redis:7-alpine
+    mem_limit: 128m
+    labels: {recovery.depends_on: ""}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 2
+
+  traffic:
+    image: curlimages/curl:8.11.1
+    entrypoint: ["sh", "-c", "while true; do curl -s -o /dev/null http://api:8000/work; sleep 0.2; done"]
+    mem_limit: 32m
+    labels: {recovery.depends_on: "api"}
+    depends_on: [api]

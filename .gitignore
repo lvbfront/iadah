@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+telemetry.db
+demo/config/*.prev
+.DS_Store
