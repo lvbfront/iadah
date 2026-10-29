@@ -11,4 +11,5 @@ actions:
   service: $root:memory_leak
   replicas: 2
 source: seed
+status: approved
 times_used: 0

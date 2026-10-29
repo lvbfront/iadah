@@ -8,4 +8,5 @@ actions:
 - action: restart
   service: $root:cache_down
 source: seed
+status: approved
 times_used: 0
