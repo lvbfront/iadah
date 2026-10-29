@@ -36,5 +36,7 @@ class Incident:
     resolved: bool = False
     stable_for_s: float = 0.0                          # length of the healthy streak verify accepted
     runbook_saved: str = ""
-    needs_human: str = ""                              # reason the agent stopped and handed over
+    needs_human: str = ""
+    topology_missing: bool = False
+    undone: list[dict] = field(default_factory=list)   # actions that ran and were then reverted                              # reason the agent stopped and handed over
     violations: list[str] = field(default_factory=list)  # invariant violations (see agent/invariants.py)

@@ -12,7 +12,7 @@ import chaos
 import config
 import telemetry
 from adapters.docker_adapter import DockerAdapter
-from agent import stages
+from agent import invariants, stages
 from agent.state import Incident
 
 console = telemetry.console
@@ -92,6 +92,8 @@ def run(scenario: str | None, adapter=None) -> Incident:
         if not stages.fast_path(inc):
             stages.investigate(inc, adapter)
             stages.diagnose(inc, adapter)
+            if inc.needs_human:
+                break
         for stage in (stages.plan, stages.act, stages.verify):
             inc.stage = stage.__name__
             stage(inc, adapter)
@@ -100,6 +102,9 @@ def run(scenario: str | None, adapter=None) -> Incident:
         if inc.resolved or inc.needs_human:
             break
     stages.postmortem(inc, adapter)
+    inc.violations = invariants.check(inc)
+    for v in inc.violations:
+        telemetry.log_step(inc.id, "invariant", note=f"[bold red]VIOLATION[/]: {v}")
     summary(inc)
     return inc
 
@@ -108,7 +113,9 @@ def summary(inc: Incident):
     tot = telemetry.totals(inc.id)
     mttd = inc.detected_at - inc.injected_at
     mttr = f"{inc.recovered_at - inc.injected_at:.1f}s" if inc.recovered_at else "—"
-    t = Table(title=f"{'[green]RESOLVED' if inc.resolved else '[red]NOT RESOLVED'}[/]  {inc.id}", show_lines=False)
+    status = "[green]RESOLVED" if inc.resolved else f"[yellow]HANDED TO HUMAN: {inc.needs_human}" if inc.needs_human \
+        else "[red]NOT RESOLVED"
+    t = Table(title=f"{status}[/]  {inc.id}", show_lines=False)
     for col in ("MTTD", "MTTR", "iterations", "escalations", "LLM tokens", "cost", "log tokens raw→compressed"):
         t.add_column(col, justify="right")
     t.add_row(f"{mttd:.1f}s", mttr, str(inc.iteration), str(inc.escalations), str(tot["tokens"]),

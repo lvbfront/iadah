@@ -92,7 +92,8 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
         diag = int(chaos.diag_correct(scenario, roots)) if detected or scenario == "0" else 0
         row |= {
             "incident": inc.id, "detected": int(detected), "resolved": resolved, "still_ok": still_ok,
-            "diag_correct": diag, "correct_and_recovered": int(diag and resolved and still_ok),
+            "diag_correct": diag,
+            "correct_and_recovered": int(diag and resolved and still_ok and not getattr(inc, "violations", [])),
             "actions": len(acts), "unnecessary_actions": unnecessary,
             "actions_taken": ";".join(f"{a}({s})" for a, s in acts),
             "invariant_violations": "; ".join(getattr(inc, "violations", [])),

@@ -78,8 +78,13 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
     while True:
         p = prompt
         for attempt in (1, 2):
-            r = get_backend(tier).complete(p, S.SRE_SYSTEM, max_tokens=1500 if tier == "small" else 8000,
-                                           schema=schema)
+            try:
+                r = get_backend(tier).complete(p, S.SRE_SYSTEM, max_tokens=1500 if tier == "small" else 8000,
+                                               schema=schema)
+            except Exception as e:  # model down / timeout / API error: same path as invalid output
+                telemetry.log_step(inc.id, stage, tier=tier, note=f"[red]{tier} model error (attempt {attempt})[/]: "
+                                                                   f"{type(e).__name__}: {str(e)[:120]}")
+                continue
             data = parse_json(r.text)
             ok = data is not None and validate(data, schema) and (check is None or check(data))
             telemetry.log_step(inc.id, stage, r, note=summarize(data) if ok else
@@ -187,6 +192,10 @@ def detect(inc: Incident, obs, log: bool = True, merge: bool = False) -> bool:
     inc.unhealthy = (inc.unhealthy | bad) if merge else bad
     bad = inc.unhealthy
     topo = obs.get_topology()
+    if not any(topo.values()) and not inc.topology_missing:
+        inc.topology_missing = True  # no dependency edges at all: can't separate roots from symptoms
+        telemetry.log_step(inc.id, "detect", note="[yellow]no topology labels: every unhealthy service is a suspect; "
+                                                  "incident treated as ambiguous (no fast path)[/]")
     # A service whose own dependencies are fine is a root-cause suspect; otherwise it's a symptom.
     inc.suspects = sorted(s for s in bad if not set(bad) & set(topo.get(s, [])))
     inc.symptoms = sorted(set(bad) - set(inc.suspects))
@@ -243,7 +252,7 @@ def _safe_metrics(obs):
 
 
 def is_ambiguous(inc: Incident) -> bool:
-    return (inc.failed_fix or inc.triage["incident_type"] == "unknown"
+    return (inc.failed_fix or inc.triage["incident_type"] == "unknown" or inc.topology_missing
             or inc.triage["confidence"] < config.FAST_PATH_CONFIDENCE)
 
 
@@ -364,7 +373,15 @@ def diagnose(inc: Incident, obs):
                            lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                      f"conf={d['confidence']:.2f} — {d['suspected_root_cause'][:80]} "
                                      f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok)
-    inc.diagnosis = _drop_symptom_roots(inc, d) or inc.triage | {"hypotheses": []}
+    if d is None:  # fail safe: never act on a diagnosis no model could produce
+        inc.needs_human = "no valid diagnosis (model unavailable or invalid output)"
+        telemetry.log_step(inc.id, "diagnose", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
+        return
+    inc.diagnosis = _drop_symptom_roots(inc, d)
+    if signature(inc.diagnosis) == ["unknown"] and inc.tier != "big":
+        inc.needs_human = "incident type unknown and no big model allowed to escalate to"
+        telemetry.log_step(inc.id, "diagnose", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
+        return
     _resolve_roots(inc)
 
 
@@ -407,6 +424,10 @@ def plan(inc: Incident, obs):
                                lambda d: "proposed " + ", ".join(f"{a['action']}({a['service']})" for a in d["actions"]),
                                check=lambda d: len(d["actions"]) > 0)
         steps, inc.plan_source = (d["actions"] if d else []), "model"
+        if not steps:
+            inc.needs_human = "no valid plan (model unavailable or invalid output)"
+            telemetry.log_step(inc.id, "plan", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
+            return
     if len(steps) > config.MAX_PLAN_STEPS:
         telemetry.log_step(inc.id, "plan", note=f"[yellow]plan truncated {len(steps)} → {config.MAX_PLAN_STEPS} steps[/]")
         steps = steps[:config.MAX_PLAN_STEPS]
@@ -446,7 +467,7 @@ def act(inc: Incident, obs):
                 telemetry.log_step(inc.id, "approve", tier="human", note=f"{a}({svc}) risk=high → auto-approved (--auto-approve)")
             else:
                 t = time.perf_counter()
-                yes = Confirm.ask(f"[yellow]Approve HIGH-risk action[/] {a}({svc})? reason: {step['reason']}",
+                yes = Confirm.ask(f"[yellow]Approve HIGH-risk action[/] {a}({svc})? reason: {step.get('reason', '')}",
                                   console=telemetry.console)
                 telemetry.log_step(inc.id, "approve", tier="human", latency_s=time.perf_counter() - t,
                                    note=f"{a}({svc}) → {'approved' if yes else '[red]denied[/]'}")
@@ -460,9 +481,11 @@ def act(inc: Incident, obs):
             telemetry.log_step(inc.id, "act", latency_s=time.perf_counter() - t, note=f"[red]{a}({svc}) failed: {e}[/]")
             for prev in reversed(done):  # all-or-nothing: undo this plan's earlier actions
                 telemetry.log_step(inc.id, "undo", note=obs.undo(prev)["detail"])
+                inc.undone.append(prev)
             done = []
             break
         rec["risk"] = risk
+        rec["approved_by"] = None if risk != "high" else ("auto" if config.AUTO_APPROVE else "human")
         done.append(rec)
         telemetry.log_step(inc.id, "act", latency_s=time.perf_counter() - t, note=f"[{risk} risk] {rec['detail']}")
         if not _wait_service(inc, obs, svc):
@@ -473,7 +496,7 @@ def act(inc: Incident, obs):
             if rec.get("undo"):
                 telemetry.log_step(inc.id, "undo", note=f"[red]worse after {a}({svc})[/]: {sorted(before)} → "
                                                         f"{sorted(after)}; {obs.undo(rec)['detail']}")
-                done.pop()
+                inc.undone.append(done.pop())
             else:
                 inc.needs_human = f"{a}({svc}) made things worse and can't be undone"
                 telemetry.log_step(inc.id, "act", tier="human", note=f"[red]stop[/]: {inc.needs_human}: "
