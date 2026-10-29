@@ -40,7 +40,8 @@ class OllamaBackend(LLMBackend):
         if schema:
             # This Ollama build returns "structured output is unavailable" for qwen3.5,
             # so the schema goes in the prompt and callers validate + retry.
-            prompt += f"\n\nRespond with ONLY a JSON object matching this JSON schema, no prose:\n{json.dumps(schema)}"
+            prompt += ("\n\nRespond with ONLY a JSON object (no prose) whose values follow this JSON schema. "
+                       "Fill in real values; do NOT repeat the schema itself:\n" + json.dumps(schema))
         msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
         body = {"model": self.model, "messages": msgs, "stream": False, "think": False,
                 "options": {"num_predict": max_tokens, "temperature": 0}}

@@ -54,6 +54,11 @@ def _plain(note: str) -> str:
     return re.sub(r"\[/?[^]]*\]", "", note).replace("|", "/")
 
 
+def _since(inc: Incident) -> int:
+    """Log window: from just before the fault, so earlier incidents don't pollute the evidence."""
+    return int(time.time() - inc.injected_at) + 15 if inc.injected_at else 180
+
+
 def _compact_health(health: dict) -> dict:
     return {s: {"status": h["status"], **({"app": h["app"]} if h.get("app") else {})} for s, h in health.items()}
 
@@ -69,8 +74,9 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
     """Call the tier's model for schema-valid JSON. Retry once on invalid output, then escalate
     (router decides; in small-only mode there's nowhere to go). Returns (data|None, tier)."""
     while True:
+        p = prompt
         for attempt in (1, 2):
-            r = get_backend(tier).complete(prompt, S.SRE_SYSTEM, max_tokens=1500 if tier == "small" else 8000,
+            r = get_backend(tier).complete(p, S.SRE_SYSTEM, max_tokens=1500 if tier == "small" else 8000,
                                            schema=schema)
             data = parse_json(r.text)
             ok = data is not None and validate(data, schema) and (check is None or check(data))
@@ -78,6 +84,9 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
                                f"[red]invalid output (attempt {attempt})[/] {r.text[:80]!r}")
             if ok:
                 return data, tier
+            # Same prompt at temperature 0 would fail the same way: tell the model what went wrong.
+            p = (prompt + f"\n\nYour previous reply was invalid:\n{r.text[:300]}\n"
+                 f"Reply with one JSON object with exactly these keys filled in: {schema.get('required')}")
         new, reason = pick_tier(invalid_output=True)
         if new == tier:
             return None, tier
@@ -127,7 +136,7 @@ def compress_logs(inc: Incident, obs):
     bad = set(inc.unhealthy)
     blast = {s for s, deps in topo.items() if bad & set(deps)}  # dependents see the fault first in their logs
     for svc in sorted(bad | blast):
-        lines = obs.get_logs(svc, tail=500, since_s=180)
+        lines = obs.get_logs(svc, tail=500, since_s=_since(inc))
         inc.log_digest[svc] = compress_lines(lines)
         n += len(lines)
         raw += est_tokens("\n".join(lines))
@@ -183,7 +192,7 @@ def investigate(inc: Incident, obs):
             break
         calls.add(key)
         if d["tool"] == "get_logs":
-            out = "\n".join(compress_lines(obs.get_logs(d["service"], tail=200, since_s=60), top=8))
+            out = "\n".join(compress_lines(obs.get_logs(d["service"], tail=200, since_s=_since(inc)), top=8))
         elif d["tool"] == "get_metrics":
             out = json.dumps(obs.get_metrics(d["service"]))
         else:

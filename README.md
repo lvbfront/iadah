@@ -22,15 +22,17 @@ cp .env.example .env   # then set ANTHROPIC_API_KEY
 cd demo && docker compose up -d --build && cd ..
 curl localhost:8000/health
 
-# 2. break it
+# 2. break it manually
 uv run chaos.py list
 uv run chaos.py 1        # redis down
 uv run chaos.py 2        # bad DB password after "deploy"
 
-# 3. run the agent
-uv run python -m agent.run
+# 2+3. or let the runner inject a fault and recover, with a live timeline
+uv run python -m agent.run --scenario 1
+uv run python -m agent.run --scenario 2 --auto-approve       # skip the y/n for high-risk actions
+uv run python -m agent.run --scenario 1 --mode big-only      # hybrid | big-only | small-only
 
-# 4. restore
+# reports land in reports/, learned runbooks in runbooks/
 uv run chaos.py reset
 ```
 
@@ -40,6 +42,7 @@ uv run python -m llm.backends small big   # one call to each backend
 uv run python -m router.rules             # routing rules self-check
 uv run python -m adapters.docker_adapter  # topology, health, metrics, logs
 sqlite3 telemetry.db "select stage,tier,model,in_tokens,out_tokens,latency_s,cost_usd,note from steps"
+sqlite3 -header telemetry.db "select scenario,mode,mttd_s,mttr_s,escalations,total_cost from incidents"
 ```
 
 See `CLAUDE.md` for architecture and progress.
