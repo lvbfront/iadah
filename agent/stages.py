@@ -102,12 +102,15 @@ def signature(d: dict) -> list[str]:
     return sorted(types or {d["incident_type"]})
 
 
-def _runbook(sig: list[str]) -> tuple[Path, dict] | None:
+def _runbook(sig: list[str], approved_only: bool = True) -> tuple[Path, dict] | None:
+    """Runbook for this signature. Only human-approved runbooks are ever applied automatically;
+    learned ones stay `pending_review` until `python -m agent.runbooks approve <name>`."""
     if sig == ["unknown"]:
         return None
     for p in sorted(Path(config.RUNBOOKS_DIR).glob("*.yaml")):
         rb = yaml.safe_load(p.read_text())
-        if sorted(rb.get("signature", {}).get("incident_types", [])) == sig:
+        if sorted(rb.get("signature", {}).get("incident_types", [])) == sig and \
+                (not approved_only or rb.get("status") == "approved"):
             return p, rb
     return None
 
@@ -392,7 +395,9 @@ def plan(inc: Incident, obs):
         else:
             inc.plan_source = f"runbook:{path.stem}"
     else:
-        telemetry.log_step(inc.id, "plan", note=f"no runbook for {sig} → asking planner model")
+        pending = _runbook(sig, approved_only=False)
+        telemetry.log_step(inc.id, "plan", note=f"runbook {pending[0].name} is pending human review → asking planner model"
+                           if pending else f"no runbook for {sig} → asking planner model")
     if not steps:
         services = sorted(inc.health)
         allow = "\n".join(f"- {a} (risk {r}): {desc}" for a, (r, desc) in S.ALLOWLIST.items())
@@ -402,11 +407,26 @@ def plan(inc: Incident, obs):
                                lambda d: "proposed " + ", ".join(f"{a['action']}({a['service']})" for a in d["actions"]),
                                check=lambda d: len(d["actions"]) > 0)
         steps, inc.plan_source = (d["actions"] if d else []), "model"
+    if len(steps) > config.MAX_PLAN_STEPS:
+        telemetry.log_step(inc.id, "plan", note=f"[yellow]plan truncated {len(steps)} → {config.MAX_PLAN_STEPS} steps[/]")
+        steps = steps[:config.MAX_PLAN_STEPS]
     # Dependency order: fix lower-level services (databases, caches) before the services that use them.
     inc.plan = sorted(steps, key=lambda x: depth(topo, x["service"]))
     if inc.plan:
         telemetry.log_step(inc.id, "plan", note=f"{inc.plan_source} → dependency order: "
                            + " → ".join(f"{x['action']}({x['service']})[d{depth(topo, x['service'])}]" for x in inc.plan))
+
+
+def risk_of(action: str, svc: str, obs) -> str:
+    """Risk per action AND service: disruptive actions on a stateful service are always high risk."""
+    risk = S.ALLOWLIST[action][0]
+    if action in ("restart", "scale"):
+        try:
+            if obs.service_meta(svc)["stateful"]:
+                return "high"
+        except Exception:
+            return "high"  # can't tell → assume the worst
+    return risk
 
 
 def act(inc: Incident, obs):
@@ -416,7 +436,11 @@ def act(inc: Incident, obs):
         if a not in S.ALLOWLIST:
             telemetry.log_step(inc.id, "act", note=f"[red]blocked[/] {a}({svc}): not allowlisted")
             continue
-        risk = S.ALLOWLIST[a][0]
+        if len(inc.actions_taken) + len(done) >= config.MAX_ACTIONS_PER_INCIDENT:
+            inc.needs_human = f"action cap {config.MAX_ACTIONS_PER_INCIDENT} reached"
+            telemetry.log_step(inc.id, "act", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
+            break
+        risk = risk_of(a, svc, obs)
         if risk == "high":
             if config.AUTO_APPROVE:
                 telemetry.log_step(inc.id, "approve", tier="human", note=f"{a}({svc}) risk=high → auto-approved (--auto-approve)")
@@ -428,6 +452,7 @@ def act(inc: Incident, obs):
                                    note=f"{a}({svc}) → {'approved' if yes else '[red]denied[/]'}")
                 if not yes:
                     continue
+        before = flags(obs.get_health(), inc.baseline)
         t = time.perf_counter()
         try:
             rec = getattr(obs, a)(svc, **({"replicas": int(step.get("replicas", 2))} if a == "scale" else {}))
@@ -442,6 +467,18 @@ def act(inc: Incident, obs):
         telemetry.log_step(inc.id, "act", latency_s=time.perf_counter() - t, note=f"[{risk} risk] {rec['detail']}")
         if not _wait_service(inc, obs, svc):
             break  # a dependency that didn't come back makes fixes above it pointless
+        time.sleep(config.ACTION_SETTLE_S)
+        after = flags(obs.get_health(), inc.baseline)
+        if len(after) > len(before):  # the action made things worse
+            if rec.get("undo"):
+                telemetry.log_step(inc.id, "undo", note=f"[red]worse after {a}({svc})[/]: {sorted(before)} → "
+                                                        f"{sorted(after)}; {obs.undo(rec)['detail']}")
+                done.pop()
+            else:
+                inc.needs_human = f"{a}({svc}) made things worse and can't be undone"
+                telemetry.log_step(inc.id, "act", tier="human", note=f"[red]stop[/]: {inc.needs_human}: "
+                                                                     f"{sorted(before)} → {sorted(after)}")
+            break
     inc.actions_taken += done
     inc.plan = done
 
@@ -503,7 +540,7 @@ def postmortem(inc: Incident, obs):
     # Learn from every action that ran across all iterations, not just the last one.
     learned = list({(a["action"], a["service"]): a for a in inc.actions_taken}.values())
     if inc.resolved and sig != ["unknown"] and learned:
-        hit = _runbook(sig)
+        hit = _runbook(sig, approved_only=False)
         if inc.plan_source.startswith("runbook:") and hit:
             path, rb = hit
             rb["times_used"] = rb.get("times_used", 0) + 1
@@ -517,8 +554,8 @@ def postmortem(inc: Incident, obs):
                   "actions": [{k: v for k, v in a.items() if k in ("action", "replicas")}
                               | {"service": f"$root:{svc_type[a['service']]}" if a["service"] in svc_type
                                  else a["service"]} for a in learned],
-                  "source": f"learned from {inc.id}", "times_used": 1}
-            inc.runbook_saved = f"{path.name} ({'updated' if hit else 'new'})"
+                  "source": f"learned from {inc.id}", "status": "pending_review", "times_used": 1}
+            inc.runbook_saved = f"{path.name} ({'updated' if hit else 'new'}, pending human review)"
         path.write_text(yaml.safe_dump(rb, sort_keys=False))
 
     tot = telemetry.totals(inc.id)

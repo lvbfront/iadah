@@ -95,7 +95,9 @@ def run(scenario: str | None, adapter=None) -> Incident:
         for stage in (stages.plan, stages.act, stages.verify):
             inc.stage = stage.__name__
             stage(inc, adapter)
-        if inc.resolved:
+            if inc.needs_human:
+                break
+        if inc.resolved or inc.needs_human:
             break
     stages.postmortem(inc, adapter)
     summary(inc)

@@ -20,6 +20,7 @@ CONFIG_LABEL = "recovery.config_path"   # config file inside the container (roll
 KILL_IDLE_LABEL = "recovery.kill_idle_cmd"  # shell command inside a DB container that kills idle clients
 SCRATCH_LABEL = "recovery.scratch_path"     # the only directory clear_disk may empty
 CONN_USAGE_LABEL = "recovery.conn_usage_cmd"  # prints % of DB connection slots in use
+STATEFUL_LABEL = "recovery.stateful"          # "true" → disruptive actions on it are high risk
 STATUS_RANK = {"healthy": 0, "running": 1, "starting": 2, "unhealthy": 3, "down": 4}
 
 
@@ -119,6 +120,10 @@ class DockerAdapter(Observability, Actions):
             health[svc] = h
         return health
 
+    def service_meta(self, service):
+        cs = self._replicas(service)
+        return {"stateful": cs[0].labels.get(STATEFUL_LABEL, "").lower() == "true", "replicas": len(cs)}
+
     def get_topology(self):
         return {c.labels[SERVICE_LABEL]: [d for d in c.labels.get(DEPENDS_LABEL, "").split(",") if d]
                 for c in self._containers() if SERVICE_LABEL in c.labels}
@@ -142,11 +147,25 @@ class DockerAdapter(Observability, Actions):
     # --- actions ---
 
     def restart(self, service):
+        """Rolling: with several replicas, each must be running/healthy again before the next restarts."""
         cs = self._replicas(service)
-        for c in cs:
+        for i, c in enumerate(cs):
             c.restart(timeout=10) if c.status == "running" else c.start()
-        return {"action": "restart", "service": service, "detail": f"restarted {service} ({len(cs)} replica(s))",
-                "undo": None}
+            if i < len(cs) - 1:
+                self._wait_up(c)
+        return {"action": "restart", "service": service,
+                "detail": f"restarted {service} ({len(cs)} replica(s){', rolling' if len(cs) > 1 else ''})", "undo": None}
+
+    @staticmethod
+    def _wait_up(c, timeout=30):
+        t = time.time()
+        while time.time() - t < timeout:
+            c.reload()
+            hc = c.attrs["State"].get("Health", {}).get("Status")
+            if c.status == "running" and hc in (None, "healthy"):
+                return
+            time.sleep(1)
+        raise RuntimeError(f"{c.name} not back after {timeout}s; rolling restart stopped")
 
     def mark_known_good(self, service):
         c = self._container(service)

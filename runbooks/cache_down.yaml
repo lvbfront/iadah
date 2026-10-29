@@ -8,5 +8,4 @@ actions:
 - action: restart
   service: $root:cache_down
 source: seed
-times_used: 2
-last_used: inc-20261030-002546
+times_used: 0

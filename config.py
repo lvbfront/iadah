@@ -31,6 +31,9 @@ STABILIZE_S = 20            # …spanning at least this long
 VERIFY_POLL_S = 3
 DETECT_WINDOW_S = 90        # give up waiting for a detection after this long
 CONTROL_WINDOW_S = 60       # scenario 0 (no fault): watch a healthy system this long
+MAX_ACTIONS_PER_INCIDENT = 6  # hard cap; reaching it hands the incident to a human
+MAX_PLAN_STEPS = 4            # longer plans are truncated
+ACTION_SETTLE_S = 5           # wait after an action before comparing health with the pre-action state
 ALERT_GROUP_S = 3          # after the first alert, wait this long and re-detect to group related alerts
 
 # Set by the CLI runner.

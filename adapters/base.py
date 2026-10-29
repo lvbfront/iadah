@@ -16,6 +16,10 @@ class Observability(ABC):
                       "app": {"error_rate", "avg_latency_ms", ...} if the service exposes metrics}}"""
 
     @abstractmethod
+    def service_meta(self, service: str) -> dict:
+        """{"stateful": bool, "replicas": int}"""
+
+    @abstractmethod
     def get_topology(self) -> dict[str, list[str]]:
         """{service: [services it depends on]}"""
 
