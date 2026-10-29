@@ -16,6 +16,7 @@ SERVICE_LABEL = "com.docker.compose.service"
 DEPENDS_LABEL = "recovery.depends_on"
 METRICS_LABEL = "recovery.metrics_url"  # JSON metrics endpoint, reachable from where the agent runs
 CONFIG_LABEL = "recovery.config_path"   # config file inside the container (rollback_config target)
+KILL_IDLE_LABEL = "recovery.kill_idle_cmd"  # shell command inside a DB container that kills idle clients
 
 
 class DockerAdapter(Observability, Actions):
@@ -139,6 +140,16 @@ class DockerAdapter(Observability, Actions):
         c.restart(timeout=10)
         return {"action": "undo", "service": record["service"],
                 "detail": f"reverted {record['action']}", "undo": None}
+
+    def kill_idle_connections(self, service):
+        c = self._container(service)
+        if KILL_IDLE_LABEL not in c.labels:
+            raise RuntimeError(f"{service} has no {KILL_IDLE_LABEL} hook (not a DB?)")
+        code, out = c.exec_run(["sh", "-c", c.labels[KILL_IDLE_LABEL]])
+        if code != 0:
+            raise RuntimeError(out.decode(errors="replace").strip())
+        return {"action": "kill_idle_connections", "service": service,
+                "detail": f"terminated {out.decode().strip()} idle connections on {service}", "undo": None}
 
     def scale(self, service, replicas):
         raise NotImplementedError

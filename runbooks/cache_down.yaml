@@ -1,10 +1,8 @@
 name: cache-down
 signature:
-  incident_type: cache_down
-description: Cache (Redis) container stopped or unreachable; dependents return 503
-  on cache ops.
+  incident_types: [cache_down]
+description: Cache (Redis) container stopped or unreachable; dependents return 503 on cache ops.
 actions:
-- action: restart
-  service: $root
+- {action: restart, service: $root:cache_down}
 source: seed
 times_used: 0

@@ -26,6 +26,7 @@ INVESTIGATE_BUDGET = 5      # LLM-chosen tool calls per iteration (ambiguous cas
 FAST_PATH_CONFIDENCE = 0.85 # triage confidence + matching runbook → skip investigate/diagnose
 RUNBOOKS_DIR = os.getenv("RUNBOOKS_DIR", "runbooks")
 VERIFY_TIMEOUT_S = 45
+ALERT_GROUP_S = 3          # after the first alert, wait this long and re-detect to group related alerts
 
 # Set by the CLI runner.
 MODE = "hybrid"             # hybrid | big-only | small-only

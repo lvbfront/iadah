@@ -25,7 +25,8 @@ class Incident:
     evidence: list[str] = field(default_factory=list)
     fast_path: bool = False
     diagnosis: dict = field(default_factory=dict)
-    root_service: str = ""
+    root_service: str = ""                             # primary root cause service
+    roots: list[dict] = field(default_factory=list)    # every root cause: [{"incident_type", "service"}]
     plan: list[dict] = field(default_factory=list)     # [{"action", "service", "reason"}]
     plan_source: str = ""                              # "runbook:<name>" | "model"
     actions_taken: list[dict] = field(default_factory=list)  # adapter action records (with undo info)

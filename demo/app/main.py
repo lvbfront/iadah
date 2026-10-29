@@ -25,7 +25,9 @@ def load_config(path="/config/app.env"):
 
 cfg = load_config()
 dsn = f"host={cfg['DB_HOST']} dbname={cfg['DB_NAME']} user={cfg['DB_USER']} password={cfg['DB_PASSWORD']} connect_timeout=2"
-pool = ConnectionPool(dsn, min_size=1, max_size=int(cfg.get("DB_POOL_SIZE", 5)), timeout=2, open=False)
+# max_lifetime: connections are recycled, so the pool needs fresh DB connections regularly (like a real app)
+pool = ConnectionPool(dsn, min_size=1, max_size=int(cfg.get("DB_POOL_SIZE", 5)), timeout=2, max_lifetime=20,
+                      reconnect_timeout=3600, open=False)
 cache = redis.Redis(host=cfg["REDIS_HOST"], socket_timeout=1, socket_connect_timeout=1)
 WINDOW_S = 10
 recent = deque()  # (ts, ok, latency_ms) for the last WINDOW_S seconds

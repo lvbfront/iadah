@@ -94,18 +94,39 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
         tier = new
 
 
-def _runbook(incident_type: str) -> tuple[Path, dict] | None:
+def signature(d: dict) -> list[str]:
+    """Incident signature = sorted set of root-cause types (a combo of faults is its own signature)."""
+    types = {rc["incident_type"] for rc in d.get("root_causes", [])} - {"unknown"}
+    return sorted(types or {d["incident_type"]})
+
+
+def _runbook(sig: list[str]) -> tuple[Path, dict] | None:
+    if sig == ["unknown"]:
+        return None
     for p in sorted(Path(config.RUNBOOKS_DIR).glob("*.yaml")):
         rb = yaml.safe_load(p.read_text())
-        if rb.get("signature", {}).get("incident_type") == incident_type:
+        if sorted(rb.get("signature", {}).get("incident_types", [])) == sig:
             return p, rb
     return None
 
 
+def _known(inc: Incident, d: dict) -> bool:
+    """A runbook exists for this signature AND it explains every topology suspect."""
+    sig = signature(d)
+    return _runbook(sig) is not None and len(sig) >= len(inc.suspects)
+
+
+def depth(topo: dict, svc: str, seen=()) -> int:
+    """0 for leaf dependencies; fixes run in ascending depth (dependencies before dependents)."""
+    deps = [d for d in topo.get(svc, []) if d not in seen]
+    return 1 + max(depth(topo, d, seen + (svc,)) for d in deps) if deps else 0
+
+
 # ---------- stages ----------
 
-def detect(inc: Incident, obs, log: bool = True) -> bool:
-    """Rules only. Unhealthy = container down/unhealthy, or app error rate / latency well above baseline."""
+def detect(inc: Incident, obs, log: bool = True, merge: bool = False) -> bool:
+    """Rules only. Unhealthy = container down/unhealthy, or app error rate / latency well above baseline.
+    merge=True unions with the previous snapshot (alert grouping: health checks can flap)."""
     t = time.perf_counter()
     inc.health = obs.get_health()
     bad = {}
@@ -118,7 +139,8 @@ def detect(inc: Incident, obs, log: bool = True) -> bool:
         elif "avg_latency_ms" in app and base and app["avg_latency_ms"] > max(3 * base["avg_latency_ms"],
                                                                              base["avg_latency_ms"] + 200):
             bad[s] = f"latency={app['avg_latency_ms']}ms"
-    inc.unhealthy = bad
+    inc.unhealthy = (inc.unhealthy | bad) if merge else bad
+    bad = inc.unhealthy
     topo = obs.get_topology()
     # A service whose own dependencies are fine is a root-cause suspect; otherwise it's a symptom.
     inc.suspects = sorted(s for s in bad if not set(bad) & set(topo.get(s, [])))
@@ -181,24 +203,35 @@ def is_ambiguous(inc: Incident) -> bool:
 
 
 def fast_path(inc: Incident) -> bool:
-    """High-confidence triage of a type we have a runbook for: skip investigate + diagnose."""
-    t = inc.triage["incident_type"]
-    if inc.iteration > 1 or is_ambiguous(inc) or _runbook(t) is None:
+    """High-confidence triage of a known signature: skip investigate + diagnose."""
+    if inc.iteration > 1 or is_ambiguous(inc) or not _known(inc, inc.triage):
         return False
     inc.fast_path = True
     inc.diagnosis = inc.triage | {"hypotheses": []}
-    _resolve_root(inc)
+    _resolve_roots(inc)
     telemetry.log_step(inc.id, "fast-path", note=f"[bold green]fast path[/]: conf {inc.triage['confidence']:.2f} ≥ "
-                                                 f"{config.FAST_PATH_CONFIDENCE} + runbook for {t} → skip investigate/diagnose")
+                                                 f"{config.FAST_PATH_CONFIDENCE} + runbook for {signature(inc.triage)}"
+                                                 " → skip investigate/diagnose")
     return True
 
 
-def _resolve_root(inc: Incident):
-    """Guard: the fix target must actually be unhealthy; otherwise trust the topology suspect."""
-    root = inc.diagnosis["root_cause_service"]
-    inc.root_service = root if root in inc.unhealthy or not inc.suspects else inc.suspects[0]
-    if inc.root_service != root:
-        telemetry.log_step(inc.id, "diagnose", note=f"root {root} is healthy → using topology suspect {inc.root_service}")
+def _resolve_roots(inc: Incident):
+    """Guard: each fix target must actually be unhealthy; otherwise use an unclaimed topology suspect."""
+    d = inc.diagnosis
+    rcs = [rc for rc in d.get("root_causes", []) if rc["incident_type"] != "unknown"] or \
+          [{"incident_type": d["incident_type"], "service": d["root_cause_service"]}]
+    roots, claimed = [], set()
+    for rc in rcs:
+        svc = rc["service"]
+        if svc not in inc.unhealthy:
+            free = [s for s in inc.suspects if s not in claimed and s not in {r["service"] for r in rcs}]
+            if free:
+                telemetry.log_step(inc.id, "diagnose", note=f"root {svc} is healthy → using topology suspect {free[0]}")
+                svc = free[0]
+        claimed.add(svc)
+        roots.append({"incident_type": rc["incident_type"], "service": svc})
+    inc.roots = roots
+    inc.root_service = roots[0]["service"]
 
 
 def triage(inc: Incident, obs):
@@ -210,18 +243,18 @@ def triage(inc: Incident, obs):
         digest="\n".join(f"[{s}]\n" + "\n".join(d) for s, d in inc.log_digest.items()))
     tier = "big" if config.MODE == "big-only" else "small"
     data, _ = ask_json(inc, "triage", tier, prompt, S.triage_schema(services),
-                       lambda d: f"type={d['incident_type']} root={d['root_cause_service']} "
+                       lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                  f"conf={d['confidence']:.2f} sev={d['severity']}",
                        check=lambda d: 0 <= d["confidence"] <= 1)
     inc.triage = data or {"incident_type": "unknown", "severity": "high", "affected_services": list(inc.unhealthy),
                           "suspected_root_cause": "triage failed", "confidence": 0.0,
-                          "root_cause_service": (inc.suspects or services)[0], "evidence": []}
+                          "root_cause_service": (inc.suspects or services)[0], "root_causes": [], "evidence": []}
 
 
 def route(inc: Incident, obs):
-    t = inc.triage["incident_type"]
-    tier, reason = pick_tier(confidence=inc.triage["confidence"], root_causes=max(1, len(inc.suspects)),
-                             seen_before=t != "unknown" and _runbook(t) is not None, failed_fix=inc.failed_fix)
+    tier, reason = pick_tier(confidence=inc.triage["confidence"],
+                             root_causes=max(1, len(inc.suspects), len(signature(inc.triage))),
+                             seen_before=_known(inc, inc.triage), failed_fix=inc.failed_fix)
     _route(inc, tier, reason)
 
 
@@ -271,37 +304,55 @@ def diagnose(inc: Incident, obs):
         return 0 <= d["confidence"] <= 1 and all(0 <= h["likelihood"] <= 1 for h in d["hypotheses"])
 
     d, inc.tier = ask_json(inc, "diagnose", inc.tier, prompt, S.diagnose_schema(services),
-                           lambda d: f"type={d['incident_type']} root={d['root_cause_service']} "
+                           lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                      f"conf={d['confidence']:.2f} — {d['suspected_root_cause'][:80]} "
                                      f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok)
     inc.diagnosis = d or inc.triage | {"hypotheses": []}
-    _resolve_root(inc)
+    _resolve_roots(inc)
 
 
 def plan(inc: Incident, obs):
-    t = inc.diagnosis["incident_type"]
+    sig = signature(inc.diagnosis)
+    topo = obs.get_topology()
     tried = [(a["action"], a["service"]) for att in inc.attempts for a in att["actions"]]
-    hit = _runbook(t) if t != "unknown" else None
+    by_type = {r["incident_type"]: r["service"] for r in inc.roots}
+    hit = _runbook(sig)
+    steps = []
     if hit:
         path, rb = hit
-        steps = [{"action": a["action"], "service": inc.root_service if a["service"] == "$root" else a["service"],
-                  "reason": f"runbook {rb['name']}"} for a in rb["actions"]]
-        if not any((s["action"], s["service"]) in tried for s in steps):
-            inc.plan, inc.plan_source = steps, f"runbook:{path.stem}"
-            telemetry.log_step(inc.id, "plan", note=f"runbook hit [bold]{path.name}[/] → "
-                                                    + ", ".join(f"{s['action']}({s['service']})" for s in steps))
-            return
-        telemetry.log_step(inc.id, "plan", note=f"runbook {path.name} already tried → asking planner model")
+        for a in rb["actions"]:
+            svc = a["service"]
+            if svc.startswith("$root"):  # "$root:<incident_type>" (or "$root" = primary root)
+                svc = by_type.get(svc.partition(":")[2], inc.root_service)
+            steps.append({k: v for k, v in a.items() if k not in ("action", "service")}
+                         | {"action": a["action"], "service": svc, "reason": f"runbook {rb['name']}"})
+        # Steps already tried on services that are healthy now worked: drop them. A tried step on a
+        # still-broken service means the runbook doesn't fix this → planner.
+        done = [x for x in steps if (x["action"], x["service"]) in tried and x["service"] not in inc.unhealthy]
+        steps = [x for x in steps if x not in done]
+        if done:
+            telemetry.log_step(inc.id, "plan", note="already fixed: " + ", ".join(f"{x['action']}({x['service']})" for x in done))
+        if not steps or any((x["action"], x["service"]) in tried for x in steps):
+            telemetry.log_step(inc.id, "plan", note=f"runbook {path.name} exhausted → asking planner model")
+            steps = []
+        else:
+            inc.plan_source = f"runbook:{path.stem}"
     else:
-        telemetry.log_step(inc.id, "plan", note=f"no runbook for {t} → asking planner model")
-    services = sorted(inc.health)
-    allow = "\n".join(f"- {a} (risk {r}): {desc}" for a, (r, desc) in S.ALLOWLIST.items())
-    prompt = S.PLAN_PROMPT.format(allowlist=allow, diagnosis=json.dumps(inc.diagnosis), tried=tried,
-                                  topology=json.dumps(obs.get_topology()))
-    d, inc.tier = ask_json(inc, "plan", inc.tier, prompt, S.plan_schema(services),
-                           lambda d: ", ".join(f"{a['action']}({a['service']})" for a in d["actions"]),
-                           check=lambda d: len(d["actions"]) > 0)
-    inc.plan, inc.plan_source = (d["actions"] if d else []), "model"
+        telemetry.log_step(inc.id, "plan", note=f"no runbook for {sig} → asking planner model")
+    if not steps:
+        services = sorted(inc.health)
+        allow = "\n".join(f"- {a} (risk {r}): {desc}" for a, (r, desc) in S.ALLOWLIST.items())
+        prompt = S.PLAN_PROMPT.format(allowlist=allow, diagnosis=json.dumps(inc.diagnosis | {"resolved_roots": inc.roots}),
+                                      tried=tried, topology=json.dumps(topo))
+        d, inc.tier = ask_json(inc, "plan", inc.tier, prompt, S.plan_schema(services),
+                               lambda d: "proposed " + ", ".join(f"{a['action']}({a['service']})" for a in d["actions"]),
+                               check=lambda d: len(d["actions"]) > 0)
+        steps, inc.plan_source = (d["actions"] if d else []), "model"
+    # Dependency order: fix lower-level services (databases, caches) before the services that use them.
+    inc.plan = sorted(steps, key=lambda x: depth(topo, x["service"]))
+    if inc.plan:
+        telemetry.log_step(inc.id, "plan", note=f"{inc.plan_source} → dependency order: "
+                           + " → ".join(f"{x['action']}({x['service']})[d{depth(topo, x['service'])}]" for x in inc.plan))
 
 
 def act(inc: Incident, obs):
@@ -325,7 +376,7 @@ def act(inc: Incident, obs):
                     continue
         t = time.perf_counter()
         try:
-            rec = getattr(obs, a)(svc)
+            rec = getattr(obs, a)(svc, **({"replicas": int(step.get("replicas", 2))} if a == "scale" else {}))
         except Exception as e:
             telemetry.log_step(inc.id, "act", latency_s=time.perf_counter() - t, note=f"[red]{a}({svc}) failed: {e}[/]")
             for prev in reversed(done):  # all-or-nothing: undo this plan's earlier actions
@@ -335,8 +386,23 @@ def act(inc: Incident, obs):
         rec["risk"] = risk
         done.append(rec)
         telemetry.log_step(inc.id, "act", latency_s=time.perf_counter() - t, note=f"[{risk} risk] {rec['detail']}")
+        if not _wait_service(inc, obs, svc):
+            break  # a dependency that didn't come back makes fixes above it pointless
     inc.actions_taken += done
     inc.plan = done
+
+
+def _wait_service(inc: Incident, obs, svc: str, timeout: float = 30) -> bool:
+    """Per-fix verify: the fixed service itself is healthy before moving up the dependency graph."""
+    t = time.perf_counter()
+    while time.perf_counter() - t < timeout:
+        st = obs.get_health().get(svc, {}).get("status")
+        if st in OK_STATUS:
+            telemetry.log_step(inc.id, "verify-fix", latency_s=time.perf_counter() - t, note=f"{svc} is {st}")
+            return True
+        time.sleep(1)
+    telemetry.log_step(inc.id, "verify-fix", latency_s=time.perf_counter() - t, note=f"[red]{svc} still {st}[/]")
+    return False
 
 
 def verify(inc: Incident, obs):
@@ -376,10 +442,13 @@ def verify(inc: Incident, obs):
 
 def postmortem(inc: Incident, obs):
     d = inc.diagnosis or inc.triage
-    t = d.get("incident_type", "unknown")
+    sig = signature(d) if d else ["unknown"]
+    t = "+".join(sig)
     # Save/update the runbook so the next occurrence is handled without escalation.
-    if inc.resolved and t != "unknown" and inc.plan:
-        hit = _runbook(t)
+    # Learn from every action that ran across all iterations, not just the last one.
+    learned = list({(a["action"], a["service"]): a for a in inc.actions_taken}.values())
+    if inc.resolved and sig != ["unknown"] and learned:
+        hit = _runbook(sig)
         if inc.plan_source.startswith("runbook:") and hit:
             path, rb = hit
             rb["times_used"] = rb.get("times_used", 0) + 1
@@ -387,10 +456,12 @@ def postmortem(inc: Incident, obs):
             inc.runbook_saved = f"{path.name} (times_used={rb['times_used']})"
         else:
             path = hit[0] if hit else Path(config.RUNBOOKS_DIR) / f"{t}.yaml"
-            rb = {"name": t.replace("_", "-"), "signature": {"incident_type": t},
+            svc_type = {r["service"]: r["incident_type"] for r in inc.roots}
+            rb = {"name": t.replace("_", "-"), "signature": {"incident_types": sig},
                   "description": d.get("suspected_root_cause", ""),
-                  "actions": [{"action": a["action"], "service": "$root" if a["service"] == inc.root_service
-                               else a["service"]} for a in inc.plan],
+                  "actions": [{k: v for k, v in a.items() if k in ("action", "replicas")}
+                              | {"service": f"$root:{svc_type[a['service']]}" if a["service"] in svc_type
+                                 else a["service"]} for a in learned],
                   "source": f"learned from {inc.id}", "times_used": 1}
             inc.runbook_saved = f"{path.name} ({'updated' if hit else 'new'})"
         path.write_text(yaml.safe_dump(rb, sort_keys=False))
@@ -413,7 +484,8 @@ def postmortem(inc: Incident, obs):
         f"- **Cost:** ${tot['cost']:.5f}   **LLM tokens:** {tot['tokens']}",
         f"- **Log compression:** ~{inc.raw_log_tokens} → ~{inc.compressed_log_tokens} tokens", "",
         "## Root cause",
-        f"- **Type:** `{t}`   **Service:** `{inc.root_service}`   **Confidence:** {d.get('confidence', 0):.2f}",
+        f"- **Signature:** `{t}`   **Confidence:** {d.get('confidence', 0):.2f}",
+        *[f"- Root cause `{r['incident_type']}` on `{r['service']}`" for r in inc.roots],
         f"- {d.get('suspected_root_cause', '')}",
         *[f"  - hypothesis ({h['likelihood']:.2f}) `{h['service']}`: {h['cause']}" for h in d.get("hypotheses", [])],
         f"- Symptoms (explained by topology): {inc.symptoms or 'none'}", "",

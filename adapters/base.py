@@ -39,6 +39,10 @@ class Actions(ABC):
     def undo(self, record: dict) -> dict: ...
 
     @abstractmethod
+    def kill_idle_connections(self, service: str) -> dict:
+        """DB services: terminate leaked idle client connections."""
+
+    @abstractmethod
     def scale(self, service: str, replicas: int) -> dict: ...
 
     @abstractmethod

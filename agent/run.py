@@ -66,12 +66,16 @@ def run(scenario: str | None, adapter=None) -> Incident:
         telemetry.log_step(inc.id, "inject", note=f"chaos scenario {scenario}: {desc}")
 
     # detect: poll rules until something is wrong
-    while not stages.detect(inc, adapter):
+    while not stages.detect(inc, adapter, log=False):
         if not scenario or time.time() - inc.injected_at > 90:
             console.print("[green]system healthy, nothing to do[/]")
             return inc
         time.sleep(1)
     inc.detected_at = time.time()
+    # Alert grouping: symptoms trail their root causes by a moment; group them into one incident.
+    telemetry.log_step(inc.id, "detect", note=f"first alert {inc.unhealthy}; grouping for {config.ALERT_GROUP_S}s")
+    time.sleep(config.ALERT_GROUP_S)
+    stages.detect(inc, adapter, merge=True)
 
     stages.compress_logs(inc, adapter)
     stages.gather(inc, adapter)

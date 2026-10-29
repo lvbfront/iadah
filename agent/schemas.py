@@ -4,30 +4,37 @@ service enum matches the live topology."""
 INCIDENT_TYPES = {
     "cache_down": "cache (Redis) unreachable or stopped",
     "db_auth_failure": "DB rejects a client's credentials (often after a config deploy); DB itself is healthy",
-    "db_pool_exhaustion": "app can't get DB connections from its pool; DB itself is healthy",
+    "db_pool_exhaustion": "DB has no free connection slots (leaked idle clients); new connections fail with "
+                          "'too many clients' or 'remaining connection slots are reserved', pool timeouts",
     "memory_leak": "a service's memory grows until it is OOM-killed or restarts",
     "disk_full": "a volume is full; writes fail",
     "slow_queries": "DB queries are slow; latency high, errors low",
     "unknown": "none of the above",
 }
 
-# risk tier per allowlisted action; only these may ever be executed
+# risk tier per allowlisted action; only these may ever be executed.
+# low = runs automatically; high = needs human approval (or --auto-approve)
 ALLOWLIST = {
     "restart": ("low", "restart the service's container"),
     "rollback_config": ("high", "restore the service's last-known-good config file and restart it"),
+    "kill_idle_connections": ("high", "DB only: terminate client connections idle > 10s (frees leaked slots; irreversible)"),
 }
 
 
 def triage_schema(services: list[str]) -> dict:
     return {"type": "object",
             "required": ["incident_type", "severity", "affected_services", "suspected_root_cause",
-                         "root_cause_service", "confidence", "evidence"],
+                         "root_cause_service", "root_causes", "confidence", "evidence"],
             "properties": {
                 "incident_type": {"type": "string", "enum": list(INCIDENT_TYPES)},
                 "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
                 "affected_services": {"type": "array", "items": {"type": "string", "enum": services}},
                 "suspected_root_cause": {"type": "string"},
                 "root_cause_service": {"type": "string", "enum": services},
+                "root_causes": {"type": "array", "items": {
+                    "type": "object", "required": ["incident_type", "service"],
+                    "properties": {"incident_type": {"type": "string", "enum": list(INCIDENT_TYPES)},
+                                   "service": {"type": "string", "enum": services}}}},
                 "confidence": {"type": "number"},
                 "evidence": {"type": "array", "items": {"type": "string"}},
             }}
@@ -55,6 +62,7 @@ def plan_schema(services: list[str]) -> dict:
         "type": "object", "required": ["action", "service", "reason"],
         "properties": {"action": {"type": "string", "enum": list(ALLOWLIST)},
                        "service": {"type": "string", "enum": services},
+                       "replicas": {"type": "number"},
                        "reason": {"type": "string"}}}}}}
 
 
@@ -69,7 +77,8 @@ Incident types:
 {types}
 
 root_cause_service is the service that must be FIXED (e.g. for a client with a bad DB password, the client, not the DB).
-Topology analysis (rules): root-cause suspects={suspects}, symptoms={symptoms}.
+root_causes lists EVERY independent root cause (several faults can happen at once); incident_type/root_cause_service
+are the most severe one. Topology analysis (rules): root-cause suspects={suspects}, symptoms={symptoms}.
 confidence is 0-1. evidence: short quotes from the logs/health below.
 
 Dependency graph (service -> depends on): {topology}
@@ -93,13 +102,16 @@ symptoms using the dependency graph: a service failing only because a dependency
 Incident types:
 {types}
 
-root_cause_service is the service that must be FIXED.
+root_cause_service is the service that must be FIXED. root_causes lists EVERY independent root cause
+(several faults can happen at once; each rule suspect needs an explanation); incident_type/root_cause_service
+are the most severe one.
 
 Evidence pack:
 {pack}"""
 
 PLAN_PROMPT = """Propose the minimal remediation for this diagnosis using ONLY these actions:
 {allowlist}
+Fix every root cause. Order does not matter: the executor runs fixes on lower-level dependencies first.
 
 Diagnosis: {diagnosis}
 Previously tried (did not resolve): {tried}
