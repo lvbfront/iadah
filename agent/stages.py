@@ -3,6 +3,7 @@ The adapter provides both Observability and Actions."""
 import json
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
@@ -18,7 +19,6 @@ from agent.state import Incident
 from llm.backends import get_backend, parse_json, validate
 from router.rules import pick_tier
 
-RUNBOOKS = Path("runbooks")
 REPORTS = Path("reports")
 OK_STATUS = ("healthy", "running")
 ERR = re.compile(r"(?i)error|fatal|fail|exception|refused|timeout|denied|unavailable|503|not known")
@@ -95,7 +95,7 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
 
 
 def _runbook(incident_type: str) -> tuple[Path, dict] | None:
-    for p in sorted(RUNBOOKS.glob("*.yaml")):
+    for p in sorted(Path(config.RUNBOOKS_DIR).glob("*.yaml")):
         rb = yaml.safe_load(p.read_text())
         if rb.get("signature", {}).get("incident_type") == incident_type:
             return p, rb
@@ -149,11 +149,64 @@ def compress_logs(inc: Incident, obs):
                             f"([bold]{raw / max(comp, 1):.0f}x smaller[/])")
 
 
+def gather(inc: Incident, obs):
+    """Evidence that's obviously needed is fetched in code, in parallel: metrics of every unhealthy
+    service, each root suspect, and the suspects' dependencies. No LLM tool calls."""
+    t = time.perf_counter()
+    topo = obs.get_topology()
+    targets = sorted(set(inc.unhealthy) | {d for s in inc.suspects for d in topo.get(s, [])})
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = dict(zip(targets, ex.map(_safe_metrics(obs), targets)))
+    inc.metrics |= results
+    inc.evidence.append("metrics (gathered in code): " + json.dumps(results)[:2500])
+    telemetry.log_step(inc.id, "gather", latency_s=time.perf_counter() - t,
+                       note=f"{len(targets)} parallel metric reads {targets} in code")
+
+
+def _safe_metrics(obs):
+    def f(svc):
+        try:
+            m = obs.get_metrics(svc)
+            m.get("app", {}).pop("started", None)
+            m.get("app", {}).pop("latency_ms_sum", None)
+            return m
+        except Exception as e:
+            return {"error": str(e)}
+    return f
+
+
+def is_ambiguous(inc: Incident) -> bool:
+    return (inc.failed_fix or inc.triage["incident_type"] == "unknown"
+            or inc.triage["confidence"] < config.FAST_PATH_CONFIDENCE)
+
+
+def fast_path(inc: Incident) -> bool:
+    """High-confidence triage of a type we have a runbook for: skip investigate + diagnose."""
+    t = inc.triage["incident_type"]
+    if inc.iteration > 1 or is_ambiguous(inc) or _runbook(t) is None:
+        return False
+    inc.fast_path = True
+    inc.diagnosis = inc.triage | {"hypotheses": []}
+    _resolve_root(inc)
+    telemetry.log_step(inc.id, "fast-path", note=f"[bold green]fast path[/]: conf {inc.triage['confidence']:.2f} ≥ "
+                                                 f"{config.FAST_PATH_CONFIDENCE} + runbook for {t} → skip investigate/diagnose")
+    return True
+
+
+def _resolve_root(inc: Incident):
+    """Guard: the fix target must actually be unhealthy; otherwise trust the topology suspect."""
+    root = inc.diagnosis["root_cause_service"]
+    inc.root_service = root if root in inc.unhealthy or not inc.suspects else inc.suspects[0]
+    if inc.root_service != root:
+        telemetry.log_step(inc.id, "diagnose", note=f"root {root} is healthy → using topology suspect {inc.root_service}")
+
+
 def triage(inc: Incident, obs):
     services = sorted(inc.health)
     prompt = S.TRIAGE_PROMPT.format(
         types=S.TYPES_TEXT, suspects=inc.suspects, symptoms=inc.symptoms,
         topology=json.dumps(obs.get_topology()), health=json.dumps(_compact_health(inc.health)),
+        metrics=json.dumps(inc.metrics),
         digest="\n".join(f"[{s}]\n" + "\n".join(d) for s, d in inc.log_digest.items()))
     tier = "big" if config.MODE == "big-only" else "small"
     data, _ = ask_json(inc, "triage", tier, prompt, S.triage_schema(services),
@@ -173,6 +226,11 @@ def route(inc: Incident, obs):
 
 
 def investigate(inc: Incident, obs):
+    """LLM-chosen tool loop, only for ambiguous cases; obvious evidence was gathered in code."""
+    if not is_ambiguous(inc):
+        telemetry.log_step(inc.id, "investigate", note=f"skipped: not ambiguous (conf {inc.triage['confidence']:.2f}), "
+                                                       "code-gathered evidence suffices")
+        return
     services = sorted(inc.health)
     calls = set()
 
@@ -217,11 +275,7 @@ def diagnose(inc: Incident, obs):
                                      f"conf={d['confidence']:.2f} — {d['suspected_root_cause'][:80]} "
                                      f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok)
     inc.diagnosis = d or inc.triage | {"hypotheses": []}
-    # Guard: the fix target must actually be unhealthy; otherwise trust the topology suspect.
-    root = inc.diagnosis["root_cause_service"]
-    inc.root_service = root if root in inc.unhealthy or not inc.suspects else inc.suspects[0]
-    if inc.root_service != root:
-        telemetry.log_step(inc.id, "diagnose", note=f"root {root} is healthy → using topology suspect {inc.root_service}")
+    _resolve_root(inc)
 
 
 def plan(inc: Incident, obs):
@@ -332,7 +386,7 @@ def postmortem(inc: Incident, obs):
             rb["last_used"] = inc.id
             inc.runbook_saved = f"{path.name} (times_used={rb['times_used']})"
         else:
-            path = hit[0] if hit else RUNBOOKS / f"{t}.yaml"
+            path = hit[0] if hit else Path(config.RUNBOOKS_DIR) / f"{t}.yaml"
             rb = {"name": t.replace("_", "-"), "signature": {"incident_type": t},
                   "description": d.get("suspected_root_cause", ""),
                   "actions": [{"action": a["action"], "service": "$root" if a["service"] == inc.root_service

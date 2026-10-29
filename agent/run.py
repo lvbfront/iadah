@@ -74,13 +74,19 @@ def run(scenario: str | None, adapter=None) -> Incident:
     inc.detected_at = time.time()
 
     stages.compress_logs(inc, adapter)
+    stages.gather(inc, adapter)
     stages.triage(inc, adapter)
     while inc.iteration < config.MAX_VERIFY_ITERATIONS:
         inc.iteration += 1
         if inc.iteration > 1:
             console.rule(f"[yellow]iteration {inc.iteration}[/]", style="yellow")
             stages.detect(inc, adapter)  # refresh unhealthy/suspects after the failed fix
-        for stage in (stages.route, stages.investigate, stages.diagnose, stages.plan, stages.act, stages.verify):
+            stages.gather(inc, adapter)
+        stages.route(inc, adapter)
+        if not stages.fast_path(inc):
+            stages.investigate(inc, adapter)
+            stages.diagnose(inc, adapter)
+        for stage in (stages.plan, stages.act, stages.verify):
             inc.stage = stage.__name__
             stage(inc, adapter)
         if inc.resolved:

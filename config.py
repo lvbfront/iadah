@@ -22,7 +22,9 @@ PRICING = {
 
 TELEMETRY_DB = os.getenv("TELEMETRY_DB", "telemetry.db")
 MAX_VERIFY_ITERATIONS = 3
-INVESTIGATE_BUDGET = 5      # tool calls per iteration
+INVESTIGATE_BUDGET = 5      # LLM-chosen tool calls per iteration (ambiguous cases only)
+FAST_PATH_CONFIDENCE = 0.85 # triage confidence + matching runbook → skip investigate/diagnose
+RUNBOOKS_DIR = os.getenv("RUNBOOKS_DIR", "runbooks")
 VERIFY_TIMEOUT_S = 45
 
 # Set by the CLI runner.

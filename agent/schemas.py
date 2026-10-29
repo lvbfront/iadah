@@ -74,6 +74,7 @@ confidence is 0-1. evidence: short quotes from the logs/health below.
 
 Dependency graph (service -> depends on): {topology}
 Health: {health}
+Metrics: {metrics}
 
 Compressed logs (count x template):
 {digest}"""

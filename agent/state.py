@@ -21,7 +21,9 @@ class Incident:
     tier: str = "small"
     route_reason: str = ""
     escalations: int = 0
+    metrics: dict = field(default_factory=dict)        # service -> metrics gathered in code
     evidence: list[str] = field(default_factory=list)
+    fast_path: bool = False
     diagnosis: dict = field(default_factory=dict)
     root_service: str = ""
     plan: list[dict] = field(default_factory=list)     # [{"action", "service", "reason"}]
