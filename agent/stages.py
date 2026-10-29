@@ -124,6 +124,55 @@ def depth(topo: dict, svc: str, seen=()) -> int:
     return 1 + max(depth(topo, d, seen + (svc,)) for d in deps) if deps else 0
 
 
+def flags(health: dict, baseline: dict, strict: bool = False) -> dict:
+    """Shared health rules. detect uses loose thresholds; verify (strict) uses tight ones and also
+    fails on 'starting' and on missing metrics for services that had a baseline."""
+    err_tol, lat_add = (0.05, 50) if strict else (0.2, 200)
+    bad = {}
+    for s, h in health.items():
+        if h["status"] not in OK_STATUS + (() if strict else ("starting",)):
+            bad[s] = f"status={h['status']}"
+        if (h.get("mem_pct") or 0) > MEM_ALERT_PCT:
+            bad[s] = f"memory={h['mem_pct']}% of limit"
+        app, base = h.get("app") or {}, baseline.get(s, {})
+        if strict and base and "error_rate" not in app:
+            bad[s] = f"metrics unavailable: {app.get('error', '?')}"
+        elif "error_rate" in app and app["error_rate"] > base.get("error_rate", 0) + err_tol:
+            bad[s] = f"error_rate={app['error_rate']} (baseline {base.get('error_rate', 0)})"
+        elif base and "avg_latency_ms" in app and app["avg_latency_ms"] > max(3 * base["avg_latency_ms"],
+                                                                              base["avg_latency_ms"] + lat_add):
+            bad[s] = f"latency={app['avg_latency_ms']}ms (baseline {base['avg_latency_ms']}ms)"
+    return bad
+
+
+def fault_checks(inc: Incident, obs, health: dict, mem0: dict) -> dict:
+    """Checks specific to each diagnosed root cause, on top of the generic health rules.
+    mem0 holds memory readings from the start of the current healthy streak."""
+    bad = {}
+    for r in inc.roots:
+        t, svc = r["incident_type"], r["service"]
+        key = f"{svc}:{t}"
+        try:
+            if t == "db_pool_exhaustion":
+                u = obs.get_metrics(svc).get("conn_usage_pct")
+                if u is None or u > 70:
+                    bad[key] = f"connection slots in use {u}% (need ≤ 70%)"
+            elif t == "memory_leak":
+                m = (health.get(svc) or {}).get("mem_pct") or 0
+                first = mem0.setdefault(svc, m)
+                if m - first > 10:
+                    bad[key] = f"memory still growing {first}% → {m}%"
+            elif t == "disk_full":
+                d = obs.get_metrics(svc).get("disk", {}).get("used_pct")
+                if d is None or d > 80:
+                    bad[key] = f"scratch disk {d}% used (need ≤ 80%)"
+            elif (health.get(svc) or {}).get("status") not in OK_STATUS:
+                bad[key] = f"{svc} status {(health.get(svc) or {}).get('status')}"
+        except Exception as e:
+            bad[key] = f"check failed: {e}"
+    return bad
+
+
 # ---------- stages ----------
 
 def detect(inc: Incident, obs, log: bool = True, merge: bool = False) -> bool:
@@ -131,18 +180,7 @@ def detect(inc: Incident, obs, log: bool = True, merge: bool = False) -> bool:
     merge=True unions with the previous snapshot (alert grouping: health checks can flap)."""
     t = time.perf_counter()
     inc.health = obs.get_health()
-    bad = {}
-    for s, h in inc.health.items():
-        if h["status"] not in OK_STATUS + ("starting",):
-            bad[s] = f"status={h['status']}"
-        app, base = h.get("app") or {}, inc.baseline.get(s, {})
-        if (h.get("mem_pct") or 0) > MEM_ALERT_PCT:
-            bad[s] = f"memory={h['mem_pct']}% of limit"
-        if "error_rate" in app and app["error_rate"] > base.get("error_rate", 0) + 0.2:
-            bad[s] = f"error_rate={app['error_rate']}"
-        elif "avg_latency_ms" in app and base and app["avg_latency_ms"] > max(3 * base["avg_latency_ms"],
-                                                                             base["avg_latency_ms"] + 200):
-            bad[s] = f"latency={app['avg_latency_ms']}ms"
+    bad = flags(inc.health, inc.baseline)
     inc.unhealthy = (inc.unhealthy | bad) if merge else bad
     bad = inc.unhealthy
     topo = obs.get_topology()
@@ -420,28 +458,26 @@ def _wait_service(inc: Incident, obs, svc: str, timeout: float = 30) -> bool:
 
 
 def verify(inc: Incident, obs):
-    """Recovered = every service healthy AND app error rate / latency back near the pre-fault baseline."""
+    """Recovered = STABLE_POLLS consecutive polls spanning ≥ STABILIZE_S where every service passes the
+    strict health rules (status, memory, error rate and latency near the pre-fault baseline) AND every
+    diagnosed root cause passes its fault-specific check. Any failing poll restarts the streak."""
     t0 = time.perf_counter()
-    report = {}
+    report, streak, since, mem0 = {}, 0, None, {}
     while time.perf_counter() - t0 < config.VERIFY_TIMEOUT_S:
         health = obs.get_health()
-        report = {}
-        for s, h in health.items():
-            if h["status"] not in OK_STATUS:
-                report[s] = f"status={h['status']}"
-            if (h.get("mem_pct") or 0) > MEM_ALERT_PCT:
-                report[s] = f"memory={h['mem_pct']}%"
-            app, base = h.get("app") or {}, inc.baseline.get(s, {})
-            if base and "error_rate" not in app:
-                report[s] = f"metrics unavailable: {app.get('error', '?')}"
-            elif base and app["error_rate"] > base["error_rate"] + 0.05:
-                report[s] = f"error_rate={app['error_rate']} (baseline {base['error_rate']})"
-            elif base and app["avg_latency_ms"] > max(3 * base["avg_latency_ms"], base["avg_latency_ms"] + 50):
-                report[s] = f"latency={app['avg_latency_ms']}ms (baseline {base['avg_latency_ms']}ms)"
-        if not report:
-            break
-        time.sleep(2)
-    inc.resolved = not report
+        report = flags(health, inc.baseline, strict=True) or fault_checks(inc, obs, health, mem0)
+        if report:
+            streak, since, mem0 = 0, None, {}
+        else:
+            streak += 1
+            since = since or time.time()
+            if streak >= config.STABLE_POLLS and time.time() - since >= config.STABILIZE_S:
+                break
+        time.sleep(config.VERIFY_POLL_S)
+    inc.stable_for_s = round(time.time() - since, 1) if since else 0.0
+    inc.resolved = (not report and streak >= config.STABLE_POLLS and inc.stable_for_s >= config.STABILIZE_S)
+    if not report and not inc.resolved:
+        report = {"*": f"healthy for only {inc.stable_for_s}s / {streak} polls before timeout"}
     inc.failed_fix = not inc.resolved
     if inc.resolved:
         inc.recovered_at = time.time()
@@ -449,7 +485,8 @@ def verify(inc: Incident, obs):
             obs.mark_known_good(s)  # verified-healthy config becomes the new rollback target
         base = {s: h["app"] for s, h in health.items() if h.get("app")}
         telemetry.log_step(inc.id, "verify", latency_s=time.perf_counter() - t0,
-                           note=f"[green]recovered[/]: all healthy, metrics at baseline {base}")
+                           note=f"[green]recovered[/]: {streak} consecutive healthy polls over {inc.stable_for_s}s, "
+                                f"fault checks pass for {[r['incident_type'] + '@' + r['service'] for r in inc.roots]}; {base}")
     else:
         inc.attempts.append({"iteration": inc.iteration, "actions": inc.plan, "verify": report})
         inc.evidence.append(f"verify after {[a['action'] + '(' + a['service'] + ')' for a in inc.plan]}: still failing {report}")

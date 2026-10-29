@@ -19,6 +19,7 @@ METRICS_LABEL = "recovery.metrics_url"  # JSON metrics endpoint, reachable from 
 CONFIG_LABEL = "recovery.config_path"   # config file inside the container (rollback_config target)
 KILL_IDLE_LABEL = "recovery.kill_idle_cmd"  # shell command inside a DB container that kills idle clients
 SCRATCH_LABEL = "recovery.scratch_path"     # the only directory clear_disk may empty
+CONN_USAGE_LABEL = "recovery.conn_usage_cmd"  # prints % of DB connection slots in use
 STATUS_RANK = {"healthy": 0, "running": 1, "starting": 2, "unhealthy": 3, "down": 4}
 
 
@@ -86,6 +87,10 @@ class DockerAdapter(Observability, Actions):
             }
         if (app := self._app_metrics(c)) is not None:
             out["app"] = app
+        if CONN_USAGE_LABEL in c.labels and c.status == "running":
+            code, pct = c.exec_run(["sh", "-c", c.labels[CONN_USAGE_LABEL]])
+            if code == 0 and pct.strip():
+                out["conn_usage_pct"] = float(pct.decode().strip())
         if SCRATCH_LABEL in c.labels and c.status == "running":
             code, df = c.exec_run(["df", "-k", c.labels[SCRATCH_LABEL]])
             if code == 0:

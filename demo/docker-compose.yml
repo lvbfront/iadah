@@ -41,6 +41,10 @@ services:
     labels:
       recovery.depends_on: ""
       # kill_idle_connections hook; runs as superuser via the reserved slots
+      # connection-usage probe (percent of max_connections), used by verify's fault-specific check
+      recovery.conn_usage_cmd: >-
+        psql -U postgres -d app -tAc "SELECT round(100.0 * count(*) / current_setting('max_connections')::int)
+        FROM pg_stat_activity WHERE backend_type='client backend'"
       recovery.kill_idle_cmd: >-
         psql -U postgres -d app -tAc "SELECT count(pg_terminate_backend(pid)) FROM pg_stat_activity
         WHERE backend_type='client backend' AND state IN ('idle','idle in transaction')

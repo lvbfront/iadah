@@ -34,4 +34,5 @@ class Incident:
     iteration: int = 0
     failed_fix: bool = False
     resolved: bool = False
+    stable_for_s: float = 0.0                          # length of the healthy streak verify accepted
     runbook_saved: str = ""

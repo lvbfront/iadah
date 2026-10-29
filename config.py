@@ -25,7 +25,10 @@ MAX_VERIFY_ITERATIONS = 3
 INVESTIGATE_BUDGET = 5      # LLM-chosen tool calls per iteration (ambiguous cases only)
 FAST_PATH_CONFIDENCE = 0.85 # triage confidence + matching runbook → skip investigate/diagnose
 RUNBOOKS_DIR = os.getenv("RUNBOOKS_DIR", "runbooks")
-VERIFY_TIMEOUT_S = 45
+VERIFY_TIMEOUT_S = 90       # give up verifying after this long
+STABLE_POLLS = 3            # recovered = this many consecutive healthy polls…
+STABILIZE_S = 20            # …spanning at least this long
+VERIFY_POLL_S = 3
 ALERT_GROUP_S = 3          # after the first alert, wait this long and re-detect to group related alerts
 
 # Set by the CLI runner.
