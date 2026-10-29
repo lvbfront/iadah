@@ -50,6 +50,7 @@ def run(scenario: str | None, adapter=None) -> Incident:
     adapter = adapter or DockerAdapter()
     inc = Incident(id=time.strftime("inc-%Y%m%d-%H%M%S"), scenario=scenario or "")
     if scenario:
+        chaos.reset()  # deterministic start: no leftover replicas, configs or chaos containers
         health = wait_healthy(adapter)
         inc.baseline = capture_baseline(adapter)
         for s in health:

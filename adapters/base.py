@@ -46,4 +46,5 @@ class Actions(ABC):
     def scale(self, service: str, replicas: int) -> dict: ...
 
     @abstractmethod
-    def clear_disk(self, service: str, path: str) -> dict: ...
+    def clear_disk(self, service: str) -> dict:
+        """Empty the service's declared scratch directory (never an arbitrary path)."""

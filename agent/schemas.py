@@ -6,8 +6,8 @@ INCIDENT_TYPES = {
     "db_auth_failure": "DB rejects a client's credentials (often after a config deploy); DB itself is healthy",
     "db_pool_exhaustion": "DB has no free connection slots (leaked idle clients); new connections fail with "
                           "'too many clients' or 'remaining connection slots are reserved', pool timeouts",
-    "memory_leak": "a service's memory grows until it is OOM-killed or restarts",
-    "disk_full": "a volume is full; writes fail",
+    "memory_leak": "a service's memory grows toward its limit (mem_pct high) until it is OOM-killed",
+    "disk_full": "a volume is full; writes fail with 'No space left on device'",
     "slow_queries": "DB queries are slow; latency high, errors low",
     "unknown": "none of the above",
 }
@@ -18,6 +18,8 @@ ALLOWLIST = {
     "restart": ("low", "restart the service's container"),
     "rollback_config": ("high", "restore the service's last-known-good config file and restart it"),
     "kill_idle_connections": ("high", "DB only: terminate client connections idle > 10s (frees leaked slots; irreversible)"),
+    "scale": ("low", "set the service's replica count (field replicas, max 5); adds capacity, reversible"),
+    "clear_disk": ("high", "empty the service's declared scratch directory (deletes temp files; irreversible)"),
 }
 
 
@@ -81,6 +83,7 @@ root_causes lists EVERY independent root cause (several faults can happen at onc
 are the most severe one. Topology analysis (rules): root-cause suspects={suspects}, symptoms={symptoms}.
 confidence is 0-1. evidence: short quotes from the logs/health below.
 
+Alerts fired by monitoring rules: {alerts}
 Dependency graph (service -> depends on): {topology}
 Health: {health}
 Metrics: {metrics}

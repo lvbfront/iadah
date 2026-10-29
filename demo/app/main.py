@@ -36,8 +36,12 @@ stats = {"requests": 0, "errors": 0, "db_errors": 0, "cache_errors": 0, "latency
 app = FastAPI()
 
 
+AUDIT = "/data/audit.log"  # small tmpfs volume; chaos scenario 4 fills it
+
+
 @app.on_event("startup")
 def startup():
+    os.makedirs("/data/tmp", exist_ok=True)
     pool.open(wait=False)
     log.info("api started, db_host=%s pool_size=%s", cfg["DB_HOST"], pool.max_size)
 
@@ -47,6 +51,15 @@ def work(response: Response):
     t = time.perf_counter()
     stats["requests"] += 1
     ok = True
+    try:
+        if os.path.exists(AUDIT) and os.path.getsize(AUDIT) > 2**20:
+            os.truncate(AUDIT, 0)  # rotate
+        with open(AUDIT, "a") as f:
+            f.write(f"{time.time()} /work\n")
+    except OSError as e:
+        ok = False
+        stats["disk_errors"] = stats.get("disk_errors", 0) + 1
+        log.error("disk error writing %s: %s", AUDIT, e)
     try:
         cache.incr("hits")
         cache.lpush("jobs", str(time.time()))

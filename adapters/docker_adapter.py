@@ -1,5 +1,6 @@
 import io
 import json
+import subprocess
 import tarfile
 import time
 import urllib.request
@@ -17,6 +18,8 @@ DEPENDS_LABEL = "recovery.depends_on"
 METRICS_LABEL = "recovery.metrics_url"  # JSON metrics endpoint, reachable from where the agent runs
 CONFIG_LABEL = "recovery.config_path"   # config file inside the container (rollback_config target)
 KILL_IDLE_LABEL = "recovery.kill_idle_cmd"  # shell command inside a DB container that kills idle clients
+SCRATCH_LABEL = "recovery.scratch_path"     # the only directory clear_disk may empty
+STATUS_RANK = {"healthy": 0, "running": 1, "starting": 2, "unhealthy": 3, "down": 4}
 
 
 class DockerAdapter(Observability, Actions):
@@ -28,11 +31,24 @@ class DockerAdapter(Observability, Actions):
     def _containers(self):
         return self.client.containers.list(all=True, filters={"label": f"{PROJECT_LABEL}={self.project}"})
 
+    def _replicas(self, service: str):
+        cs = sorted((c for c in self._containers() if c.labels.get(SERVICE_LABEL) == service), key=lambda c: c.name)
+        if not cs:
+            raise KeyError(f"no container for service {service!r}")
+        return cs
+
     def _container(self, service: str):
-        for c in self._containers():
-            if c.labels.get(SERVICE_LABEL) == service:
-                return c
-        raise KeyError(f"no container for service {service!r}")
+        return self._replicas(service)[0]
+
+    @staticmethod
+    def _mem_pct(c) -> float | None:
+        if c.status != "running":
+            return None
+        m = c.stats(stream=False, one_shot=True).get("memory_stats", {})
+        if not m.get("limit"):
+            return None
+        used = m.get("usage", 0) - m.get("stats", {}).get("inactive_file", 0)
+        return round(100 * used / m["limit"], 1)
 
     @staticmethod
     def _app_metrics(c) -> dict | None:
@@ -55,7 +71,8 @@ class DockerAdapter(Observability, Actions):
 
     def get_metrics(self, service):
         c = self._container(service)
-        out = {"service": service, "status": c.status, "restarts": c.attrs["RestartCount"]}
+        out = {"service": service, "status": c.status, "restarts": c.attrs["RestartCount"],
+               "oom_killed": c.attrs["State"].get("OOMKilled", False), "replicas": len(self._replicas(service))}
         if c.status == "running":
             s = c.stats(stream=False)
             mem = s.get("memory_stats", {})
@@ -69,18 +86,31 @@ class DockerAdapter(Observability, Actions):
             }
         if (app := self._app_metrics(c)) is not None:
             out["app"] = app
+        if SCRATCH_LABEL in c.labels and c.status == "running":
+            code, df = c.exec_run(["df", "-k", c.labels[SCRATCH_LABEL]])
+            if code == 0:
+                size, used = df.decode().splitlines()[-1].split()[1:3]
+                out["disk"] = {"path": c.labels[SCRATCH_LABEL], "used_pct": round(100 * int(used) / int(size), 1)}
         return out
 
     def get_health(self):
+        """Per service; with several replicas, the worst replica wins (status, memory)."""
         health = {}
         for c in self._containers():
             svc = c.labels.get(SERVICE_LABEL)
             if svc is None:
                 continue
             hc = c.attrs["State"].get("Health", {}).get("Status")  # healthy/unhealthy/starting/None
-            h = {"status": "down" if c.status != "running" else (hc or "running"), "state": c.status}
+            h = {"status": "down" if c.status != "running" else (hc or "running"), "state": c.status,
+                 "mem_pct": self._mem_pct(c)}
             if (app := self._app_metrics(c)) is not None:
                 h["app"] = {k: app[k] for k in ("error_rate", "avg_latency_ms", "window_requests", "error") if k in app}
+            prev = health.get(svc)
+            if prev:
+                h["replicas"] = prev.get("replicas", 1) + 1
+                h["mem_pct"] = max(filter(None, [h["mem_pct"], prev["mem_pct"]]), default=None)
+                if STATUS_RANK[prev["status"]] > STATUS_RANK[h["status"]]:
+                    h["status"], h["state"] = prev["status"], prev["state"]
             health[svc] = h
         return health
 
@@ -107,9 +137,11 @@ class DockerAdapter(Observability, Actions):
     # --- actions ---
 
     def restart(self, service):
-        c = self._container(service)
-        c.restart(timeout=10) if c.status == "running" else c.start()
-        return {"action": "restart", "service": service, "detail": f"restarted {service}", "undo": None}
+        cs = self._replicas(service)
+        for c in cs:
+            c.restart(timeout=10) if c.status == "running" else c.start()
+        return {"action": "restart", "service": service, "detail": f"restarted {service} ({len(cs)} replica(s))",
+                "undo": None}
 
     def mark_known_good(self, service):
         c = self._container(service)
@@ -133,6 +165,9 @@ class DockerAdapter(Observability, Actions):
                 "undo": {"config": current}}
 
     def undo(self, record):
+        if record["action"] == "scale":
+            self.scale(record["service"], record["undo"]["replicas"])
+            return {"action": "undo", "service": record["service"], "detail": "reverted scale", "undo": None}
         if not record.get("undo"):
             return {"action": "undo", "service": record["service"], "detail": "nothing to undo", "undo": None}
         c = self._container(record["service"])
@@ -152,10 +187,26 @@ class DockerAdapter(Observability, Actions):
                 "detail": f"terminated {out.decode().strip()} idle connections on {service}", "undo": None}
 
     def scale(self, service, replicas):
-        raise NotImplementedError
+        replicas = max(1, min(int(replicas), 5))  # ponytail: hard cap so a bad plan can't eat the laptop
+        c = self._container(service)
+        before = len(self._replicas(service))
+        files = c.labels["com.docker.compose.project.config_files"].split(",")
+        subprocess.run(["docker", "compose", "-p", self.project, *sum((["-f", f] for f in files), []),
+                        "up", "-d", "--no-recreate", "--no-deps", "--scale", f"{service}={replicas}", service],
+                       check=True, capture_output=True)
+        return {"action": "scale", "service": service, "detail": f"scaled {service} {before} → {replicas} replicas",
+                "undo": {"replicas": before}}
 
-    def clear_disk(self, service, path):
-        raise NotImplementedError
+    def clear_disk(self, service):
+        c = self._container(service)
+        path = c.labels.get(SCRATCH_LABEL)
+        if not path:
+            raise RuntimeError(f"{service} has no {SCRATCH_LABEL}; refusing to delete anything")
+        code, out = c.exec_run(["sh", "-c", f'du -sk "{path}" | cut -f1; find "{path}" -mindepth 1 -delete'])
+        if code != 0:
+            raise RuntimeError(out.decode(errors="replace").strip())
+        return {"action": "clear_disk", "service": service,
+                "detail": f"freed {int(out.decode().split()[0]) // 1024} MB under {path} on {service}", "undo": None}
 
 
 if __name__ == "__main__":

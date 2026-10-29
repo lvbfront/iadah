@@ -21,6 +21,7 @@ from router.rules import pick_tier
 
 REPORTS = Path("reports")
 OK_STATUS = ("healthy", "running")
+MEM_ALERT_PCT = 75
 ERR = re.compile(r"(?i)error|fatal|fail|exception|refused|timeout|denied|unavailable|503|not known")
 DOCKER_TS = re.compile(r"^\S+Z\s+")
 
@@ -60,7 +61,8 @@ def _since(inc: Incident) -> int:
 
 
 def _compact_health(health: dict) -> dict:
-    return {s: {"status": h["status"], **({"app": h["app"]} if h.get("app") else {})} for s, h in health.items()}
+    return {s: {"status": h["status"], "mem_pct": h.get("mem_pct"), **({"app": h["app"]} if h.get("app") else {})}
+            for s, h in health.items()}
 
 
 def _route(inc: Incident, tier: str, reason: str):
@@ -134,6 +136,8 @@ def detect(inc: Incident, obs, log: bool = True, merge: bool = False) -> bool:
         if h["status"] not in OK_STATUS + ("starting",):
             bad[s] = f"status={h['status']}"
         app, base = h.get("app") or {}, inc.baseline.get(s, {})
+        if (h.get("mem_pct") or 0) > MEM_ALERT_PCT:
+            bad[s] = f"memory={h['mem_pct']}% of limit"
         if "error_rate" in app and app["error_rate"] > base.get("error_rate", 0) + 0.2:
             bad[s] = f"error_rate={app['error_rate']}"
         elif "avg_latency_ms" in app and base and app["avg_latency_ms"] > max(3 * base["avg_latency_ms"],
@@ -237,7 +241,7 @@ def _resolve_roots(inc: Incident):
 def triage(inc: Incident, obs):
     services = sorted(inc.health)
     prompt = S.TRIAGE_PROMPT.format(
-        types=S.TYPES_TEXT, suspects=inc.suspects, symptoms=inc.symptoms,
+        types=S.TYPES_TEXT, suspects=inc.suspects, symptoms=inc.symptoms, alerts=json.dumps(inc.unhealthy),
         topology=json.dumps(obs.get_topology()), health=json.dumps(_compact_health(inc.health)),
         metrics=json.dumps(inc.metrics),
         digest="\n".join(f"[{s}]\n" + "\n".join(d) for s, d in inc.log_digest.items()))
@@ -294,7 +298,7 @@ def investigate(inc: Incident, obs):
 def diagnose(inc: Incident, obs):
     services = sorted(inc.health)
     # Compact evidence pack: never raw logs.
-    pack = json.dumps({"triage": inc.triage, "topology": obs.get_topology(),
+    pack = json.dumps({"alerts": inc.unhealthy, "triage": inc.triage, "topology": obs.get_topology(),
                        "rule_suspects": inc.suspects, "rule_symptoms": inc.symptoms,
                        "health": _compact_health(inc.health), "compressed_logs": inc.log_digest,
                        "investigation": inc.evidence, "failed_attempts": inc.attempts})
@@ -415,6 +419,8 @@ def verify(inc: Incident, obs):
         for s, h in health.items():
             if h["status"] not in OK_STATUS:
                 report[s] = f"status={h['status']}"
+            if (h.get("mem_pct") or 0) > MEM_ALERT_PCT:
+                report[s] = f"memory={h['mem_pct']}%"
             app, base = h.get("app") or {}, inc.baseline.get(s, {})
             if base and "error_rate" not in app:
                 report[s] = f"metrics unavailable: {app.get('error', '?')}"

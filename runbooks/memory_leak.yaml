@@ -1,0 +1,14 @@
+name: memory-leak
+signature:
+  incident_types:
+  - memory_leak
+description: A service's memory grows until OOM. Restart clears it; an extra replica
+  keeps throughput if it recurs.
+actions:
+- action: restart
+  service: $root:memory_leak
+- action: scale
+  service: $root:memory_leak
+  replicas: 2
+source: seed
+times_used: 0

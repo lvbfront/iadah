@@ -12,10 +12,12 @@ services:
     <<: *app
     ports: ["8000:8000"]
     mem_limit: 256m
+    tmpfs: ["/data:size=16m"]
     labels:
       recovery.depends_on: "db,cache"
       recovery.metrics_url: "http://localhost:8000/metrics"
       recovery.config_path: "/config/app.env"
+      recovery.scratch_path: "/data/tmp"
     depends_on: {db: {condition: service_healthy}, cache: {condition: service_started}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=2)"]

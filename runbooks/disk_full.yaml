@@ -1,0 +1,10 @@
+name: disk-full
+signature:
+  incident_types:
+  - disk_full
+description: A service's scratch volume is full; writes fail with ENOSPC.
+actions:
+- action: clear_disk
+  service: $root:disk_full
+source: seed
+times_used: 0

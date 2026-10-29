@@ -27,6 +27,17 @@ def bad_db_password():
     compose("restart", "api")
 
 
+def worker_memory_leak():
+    """Flips the worker's leak flag; it then grows 8MB/s toward its 256MB limit."""
+    subprocess.run(["docker", "exec", "demo-worker-1", "touch", "/tmp/leak"], check=True, capture_output=True)
+
+
+def disk_fill():
+    """A runaway export fills the api's 16MB scratch volume; audit-log writes then fail with ENOSPC."""
+    subprocess.run(["docker", "exec", "demo-api-1", "sh", "-c",
+                    "dd if=/dev/zero of=/data/tmp/export-$(date +%s).tmp bs=1M count=32"], capture_output=True)
+
+
 LEAK = "demo-chaos-leak"
 
 
@@ -62,15 +73,26 @@ def reset():
     subprocess.run(["docker", "rm", "-f", LEAK], capture_output=True)
     if PREV.exists():
         shutil.move(PREV, CFG)
-    compose("up", "-d")
-    compose("restart", "api", "worker")
+    compose("up", "-d", "--scale", "worker=1")
+    compose("restart", "api", "worker")  # also clears the api tmpfs and the worker leak
 
 
 SCENARIOS = {
     "1": ("redis down", redis_down),
     "2": ("bad DB password after deploy", bad_db_password),
+    "3": ("worker memory leak", worker_memory_leak),
+    "4": ("disk fill on api scratch volume", disk_fill),
     "5": ("redis down + DB connection exhaustion", redis_down_and_db_exhaustion),
     "reset": ("restore healthy state", reset),
+}
+
+# Ground truth root causes per scenario: {(incident_type, service)} — used by benchmarks/run.py
+TRUTH = {
+    "1": {("cache_down", "cache")},
+    "2": {("db_auth_failure", "api")},
+    "3": {("memory_leak", "worker")},
+    "4": {("disk_full", "api")},
+    "5": {("cache_down", "cache"), ("db_pool_exhaustion", "db")},
 }
 
 if __name__ == "__main__":
