@@ -306,7 +306,9 @@ def triage(inc: Incident, obs):
 def route(inc: Incident, obs):
     tier, reason = pick_tier(confidence=inc.triage["confidence"],
                              root_causes=max(1, len(inc.suspects), len(signature(inc.triage))),
-                             seen_before=_known(inc, inc.triage), failed_fix=inc.failed_fix)
+                             seen_before=_known(inc, inc.triage), failed_fix=inc.failed_fix,
+                             unknown="unknown" in [inc.triage["incident_type"]] + [r["incident_type"] for r in
+                                                                                  inc.triage.get("root_causes", [])])
     _route(inc, tier, reason)
 
 
