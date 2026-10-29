@@ -3,80 +3,117 @@
 **Goal:** an AI agent that detects, diagnoses, fixes, and verifies recovery of a failing system, including multiple simultaneous faults.
 **Deadline:** Saturday 8 PM Riyadh time. A working end-to-end path matters more than completeness.
 
-**Differentiator:** hybrid model routing. The small local model (Ollama `qwen3.5:4b`, native macOS/Metal) handles routine steps. The big model (`claude-sonnet-5-5` via the `anthropic` SDK) is used only when `router/rules.py` escalates: low confidence, multiple independent root causes, an unseen incident signature, or a failed fix. Every step logs its tier, model, tokens, latency, and cost to SQLite.
+**Differentiator:** hybrid model routing. The small local model (Ollama `qwen3.5:4b`, native macOS/Metal) handles routine steps. The big model (`claude-sonnet-5-5` via the `anthropic` SDK) is used only when `router/rules.py` escalates: unknown type, low confidence, multiple independent root causes, an unseen incident signature, a failed fix, or a failed or invalid small-model call. Every step logs its tier, the model that actually answered, tokens, latency, and cost to SQLite.
 
 ## Architecture
 ```
 inject → detect (rules, polled; 3s alert-grouping window) → compress (drain3) → gather (parallel metric reads, code)
-  → triage (small) → [route → FAST PATH? (conf ≥ 0.85 + runbook for the signature → skip to plan)
+  → triage (small) → [route → FAST PATH? (conf ≥ 0.85 + approved runbook + triage roots == topology suspects)
                        | investigate (LLM tool loop, only if ambiguous) → diagnose]
-  → plan (runbook first; dependency order) → act (allowlist + approval; per-fix verify) → verify (system + baseline)] ×≤3
-  → postmortem (reports/*.md + save/update runbooks/*.yaml)
+  → plan (approved runbook first; ≤4 steps; dependency order) → act (allowlist, per-service risk, approval,
+    per-fix verify, auto-undo if worse, ≤6 ops) → verify (3 healthy polls over ≥20s + baseline + fault checks)] ×≤3
+  → postmortem (reports/*.md; learned runbook → <sig>.learned.yaml, pending review) → invariants
 ```
-- **Signatures**: diagnoses carry `root_causes: [{incident_type, service}]`; the incident signature is the sorted set of types (a combo like `cache_down+db_pool_exhaustion` is its own signature/runbook). Runbook actions target `$root:<incident_type>`.
-- **Routing** (`router/rules.py`): escalate to big on invalid JSON twice, failed fix, >1 independent root cause (topology suspects or triage roots), unseen signature (no runbook that explains every suspect), confidence < 0.7. `--mode big-only|small-only` overrides. Every decision is logged as a `route` step with its reason.
-- **JSON stages** (`stages.ask_json`): validate → retry once with error feedback → escalate. Ollama's qwen3.5 build has no structured output, so the schema goes in the prompt. Claude uses `output_config` json_schema.
-- **Root-cause guard**: if the model names a healthy service as a root, an unclaimed topology suspect is used instead (e.g. db_auth_failure → fix the api's config, not the db).
-- **Actions**: `agent/schemas.py:ALLOWLIST` with risk tiers. Low (auto): `restart`, `scale` (≤5 replicas). High (y/n, or `--auto-approve`): `rollback_config`, `kill_idle_connections`, `clear_disk`. Each action returns a record with undo info (rollback_config and scale are undoable). A failure mid-plan undoes the plan's earlier actions. Actions are sorted by dependency depth (leaf deps first). After each one, that service must be healthy (`verify-fix`) before the next runs.
-- **Adapter hooks via labels**: `recovery.depends_on`, `recovery.metrics_url`, `recovery.config_path` (rollback target), `recovery.kill_idle_cmd` (DB admin command), `recovery.scratch_path` (the only dir clear_disk may empty).
-- **Last-known-good config**: `.state/lkg/<project>/<service>`, saved at baseline and after every verified recovery. Config is read and written through the Docker archive API at the path in the `recovery.config_path` label.
-- **Detect/verify rules**: container down/unhealthy, memory > 75% of limit, app error rate > baseline+0.2 (verify: +0.05), latency > max(3×, +200ms) (verify: +50ms). Verify polls for up to 45s.
-- **Learning**: a resolved incident saves a runbook for its signature from every action that ran (across iterations). A runbook step already tried on a now-healthy service is dropped; a tried step on a still-broken service sends the plan to the planner model.
-- **Telemetry**: `steps` (tier, requested_model, model actually answering, tokens, latency, cost, note) and `incidents` (MTTD, MTTR, raw vs compressed log tokens, escalations, cost). MTTD/MTTR are measured from when the chaos call returns.
-- **Log windows** start 15s before injection, so leftover logs from earlier incidents don't pollute the evidence.
+- **Signatures**: diagnoses carry `root_causes: [{incident_type, service}]`. The signature is the sorted set of types, so a combo is its own signature. Runbook actions target `$root:<incident_type>`.
+- **Consistency gate** (`stages.roots_consistent`): a triage or diagnosis must name only unhealthy services, and at least one that isn't a topology symptom. Otherwise it's treated as invalid output: retry once with a constraint hint, then escalate, then hand to a human. It is never silently rewritten. Topology symptoms are dropped from roots afterwards.
+- **Routing** (`router/rules.py`): mode override first. Then: failed/invalid small output, failed fix, unknown type, >1 independent root cause, unseen signature (no *approved* runbook covering every suspect), confidence < 0.7 → big. Every decision is logged as a `route` step with its reason.
+- **JSON stages** (`stages.ask_json`): model exceptions are treated like invalid output. Validate → retry once with error feedback → escalate. Ollama's qwen3.5 build has no structured output, so the schema goes in the prompt. Claude uses `output_config` json_schema. A refusal counts as invalid output, and its tokens are logged.
+- **Fail safe**: no valid diagnosis or plan, or "unknown" with no big model allowed → `needs_human`, no actions. An iteration with no alert after a failed verify re-verifies only and never takes new actions.
+- **Actions**: `agent/schemas.py:ALLOWLIST`. Low (auto): `restart`, `scale` (≤5). High (y/n, or `--auto-approve`): `rollback_config`, `kill_idle_connections`, `clear_disk`, plus restart/scale on a `recovery.stateful` service (`stages.risk_of`).
+  - Restarts of multi-replica services are rolling.
+  - A failure mid-plan undoes the plan's earlier actions.
+  - After each action the agent waits for the service to come back (`verify-fix`) and compares the flagged-service count with before. If it's worse, the action is undone, or the agent stops and hands over if it can't be undone.
+  - Caps: 6 executed operations per incident (reverted actions and undos count), 4 plan steps.
+- **Adapter hooks via labels**: `recovery.depends_on`, `recovery.metrics_url`, `recovery.config_path`, `recovery.kill_idle_cmd`, `recovery.conn_usage_cmd`, `recovery.scratch_path`, `recovery.stateful`.
+- **Last-known-good config**: `.state/lkg/<project>/<service>`, saved at baseline and after every verified recovery. Rollback refuses an LKG older than 6h. api and worker have separate config dirs (`demo/config/{api,worker}`).
+- **Detect/verify rules** (`stages.flags`):
+  - Detect (loose): down/unhealthy, memory > 75%, error rate > baseline+0.2, latency > max(3×, +200ms).
+  - Verify (strict): also fails on "starting" and missing metrics; error tolerance +0.05, latency +50ms.
+  - Verify also requires 3 consecutive passing polls over ≥20s (monotonic clock), plus fault checks per diagnosed root: db connection usage ≤ 70%, memory not growing > 10pp, scratch disk ≤ 80%, root service healthy.
+- **Baseline**: taken after a full 10s metrics window with 0 errors, 5 samples.
+- **Learning**: a resolved incident writes `<signature>.learned.yaml` with `status: pending_review` from every action that ran. Only `status: approved` runbooks are used (fast path, routing, plan). Approve with `python -m agent.runbooks approve <name>`. Seed and approved files are never overwritten.
+- **Invariants** (`agent/invariants.py`), checked after every incident:
+  - Every high-risk action was approved, and auto-approval only happens under `--auto-approve`.
+  - The approval count in telemetry matches the high-risk actions.
+  - The act steps in telemetry match the agent's records.
+  - Executed operations ≤ cap.
+  - Recovery comes only after a ≥20s stable window.
+  - Each step's cost equals price × tokens, and the incident cost equals the sum of its steps.
+- **Telemetry**: `steps` and `incidents` tables. The MTTD/MTTR clock starts *before* injection.
 
-The agent never touches Docker directly. It goes through `adapters/base.py` (`Observability`, `Actions`), so K8s, Prometheus, or ELK adapters can be added later without changing the agent.
+The agent never touches Docker directly. It goes through `adapters/base.py` (`Observability`, `Actions`).
 
 ## Layout
 | Path | What |
 |---|---|
-| `config.py` | env + model names + pricing table (USD/MTok); local cost = 0 |
-| `adapters/base.py` | abstract interfaces |
-| `adapters/docker_adapter.py` | Docker SDK impl; topology from `recovery.depends_on` container labels |
-| `llm/backends.py` | `LLMResult`, `OllamaBackend`, `AnthropicBackend`, `get_backend(tier)` |
+| `config.py` | env, model names, pricing, thresholds, caps |
+| `adapters/base.py`, `adapters/docker_adapter.py` | interfaces; Docker SDK impl (label-driven) |
+| `llm/backends.py` | `OllamaBackend`, `AnthropicBackend`, `get_backend(tier)`, `parse_json`, `validate` |
 | `router/rules.py` | `pick_tier(...) -> (tier, reason)` |
-| `telemetry/__init__.py` | `log_step(...)` → `telemetry.db` table `steps` |
-| `agent/state.py` | `Incident` dataclass (the state) |
-| `agent/schemas.py` | JSON schemas, prompts, incident types, action allowlist |
-| `agent/stages.py` | one function per stage `(incident, adapter)` + `ask_json`, drain3 `compress_lines` |
-| `agent/run.py` | CLI runner: baseline → inject → detect poll → loop → postmortem → summary |
-| `reports/` | incident reports (gitignored) |
-| `chaos.py` | fault injection 1–5 + `reset`; `TRUTH` = ground-truth root causes per scenario |
-| `benchmarks/run.py` | scenario × mode × cold/warm × N benchmark → `benchmarks/results.{csv,md}`, `summary.csv` |
-| `demo/` | docker-compose target system: api, worker, db, cache, traffic |
-| `runbooks/` | postmortems saved as reusable runbooks |
+| `telemetry/__init__.py` | `log_step`, incidents table, live timeline printer |
+| `agent/state.py` | `Incident` dataclass |
+| `agent/schemas.py` | schemas, prompts, incident types (generic), allowlist |
+| `agent/stages.py` | stages + `ask_json`, `flags`, `fault_checks`, `roots_consistent`, `risk_of` |
+| `agent/run.py` | CLI runner |
+| `agent/invariants.py` | post-incident invariant checks |
+| `agent/runbooks.py` | `list` / `approve` CLI for learned runbooks |
+| `chaos.py` | scenarios 0–6 + `reset`; `TRUTH`, `EXPECTED_ACTIONS`, `diag_correct` |
+| `benchmarks/run.py` | benchmark (resumable, sleep guard) → `benchmarks/results.{csv,md}`; v1 in `benchmarks/v1/` |
+| `tests/failsafe.py` | break-the-agent cases (Ollama down, Claude down, bad JSON, no topology, action throws) |
+| `demo/` | target system: api, worker, db, cache, traffic |
+| `runbooks/` | seed runbooks (approved) + learned (`*.learned.yaml`, pending review) |
 
 ## Conventions
-- The agent runs on the host. Ollama runs natively on `localhost:11434` (containers would use `host.docker.internal:11434`).
-- Each module has a `__main__` self-check where useful (`python -m router.rules`, `-m llm.backends`, `-m adapters.docker_adapter`).
-- Stages mutate `Incident`. Every LLM call and every decision goes through `telemetry.log_step`, which also prints the live timeline row.
+- The agent runs on the host. Ollama runs natively on `localhost:11434`.
+- Self-checks: `python -m router.rules`, `-m llm.backends`, `-m adapters.docker_adapter`, `-m tests.failsafe`.
+- Every LLM call and decision goes through `telemetry.log_step`, which also prints the live timeline row.
 - `.env` is gitignored. Never commit keys.
-- The demo api reads `/config/app.env` (a mounted file), so a "bad deploy" is a config edit plus a restart. chaos saves the previous version to `app.env.prev`.
-- Demo Postgres: superuser `postgres`; the `app` and `reporting` roles are non-superusers and `max_connections=30`, so connection exhaustion is real. db-init.sql only runs on a fresh volume (`docker compose up -d --force-recreate --renew-anon-volumes db`).
-- Scenarios: 1 redis down · 2 bad DB password after deploy · 3 worker memory leak (8MB/s) · 4 api scratch tmpfs full (ENOSPC) · 5 redis down + DB connection exhaustion (runaway `reporting` job).
-- `agent.run --scenario N` always runs `chaos.reset()` first, so every run starts from the same state.
-- Runbooks in git are seeds (`source: seed`, `times_used: 0`). Reset counters before committing. The scenario-5 combo is deliberately unseeded.
+- Demo Postgres: superuser `postgres`; `app` and `reporting` are non-superusers, `max_connections=30`. db-init.sql runs only on a fresh volume.
+- Scenarios:
+  - 0: control
+  - 1: redis down
+  - 2: bad DB password after deploy
+  - 3: worker memory leak
+  - 4: api scratch tmpfs full
+  - 5: redis down + DB connection exhaustion
+  - 6: **held out**, wrong REDIS_HOST after deploy, graded on the root service. No prompt or runbook was tuned for it.
+- `agent.run --scenario N` always runs `chaos.reset()` first.
+- Runbooks in git are approved seeds with `times_used: 0`. Reset counters before committing. **Never commit a learned scenario-5 combo runbook** (it's recorded live).
+- Benchmarks always run under `caffeinate -dimsu`. Runs where the machine slept more than 60s are rerun.
+
+## Decisions made autonomously (overnight 2026-10-30)
+- **Verify fault checks** are keyed by the *diagnosed* type. A wrong diagnosis is verified against the wrong check, but the generic strict rules over all services still apply.
+- **Scenario 6 truth** is `("*", "api")`: the vocabulary has no type for "wrong hostname in config", and adding one would be tuning on the held-out scenario.
+- **The fast-path misfire on scenario 6 is not fixed.** The small model triaged `cache_down@api`, and the cache runbook restarted the api (low risk, caught by verify, escalated, then fixed by rollback). Scoping runbooks per service would be a runbook change motivated by the held-out scenario. Documented as a known limitation instead.
+- **"Worse after an action"** = more services flagged by the loose detect rules ACTION_SETTLE_S (5s) after the service is back. Count-based, to avoid noise from error-rate windows.
+- **Expected actions** per scenario are strict. restart(db) for scenario 5 and restart(api) for scenario 4 count as unnecessary.
+- **Primary diagnosis accuracy** grades the agent's final roots (model output minus topology symptoms). Model-raw accuracy is reported alongside.
+
+## Known limitations
+- **Incident vocabulary is small and maps closely onto scenarios 1–5** (only `slow_queries` is a decoy). Warm runs are close to scripted. Scenario 6 and the cold condition are the honest tests.
+- **Runbooks are keyed by incident type only, not by service.** A misclassified type runs that runbook on whichever service the model named (seen on scenario 6: a needless `restart(api)`).
+- **The small model can't label DB connection exhaustion**, so scenario 5 always needs the big model to diagnose.
+- **Log digest error pattern** (`stages.ERR`) includes `not known`, added in v1 for scenario 1's DNS errors. It also boosts scenario 6's identical DNS error, so scenario 6 isn't 100% clean.
+- **The worker has no healthcheck or metrics.** Verify sees only that it's running and its memory, not whether it's draining jobs.
+- **Live mode (no `--scenario`)** has no baseline, so detect relies on absolute rules, and LKG configs may be up to 6h old.
+- **Topology comes only from labels.** Missing labels are detected and force escalation; wrong labels are not detected.
+- **Confidence is the model's self-report**, gated by consistency with the topology, not calibrated.
+- **"Worse after an action" uses the flagged-service count only.**
 
 ## Run
 ```bash
 uv sync
 cd demo && docker compose up -d --build && cd ..
-uv run python -m adapters.docker_adapter   # observe
-uv run python -m agent.run --scenario 1                 # inject + recover, live timeline
-uv run python -m agent.run --scenario 2 --auto-approve  # high-risk rollback without prompt
-uv run python -m agent.run --scenario 1 --mode big-only # comparison modes
-uv run chaos.py reset                      # manual chaos: 1-5, reset
-uv run python -m benchmarks.run --n 3      # full benchmark (resumable); --report-only to re-render
-uv run python -m llm.backends small big    # test LLM backends
-sqlite3 -header telemetry.db "select scenario,mode,mttd_s,mttr_s,escalations,total_cost,raw_log_tokens,compressed_log_tokens from incidents"
+uv run python -m agent.run --scenario 5                      # y/n prompts for high-risk actions
+uv run python -m agent.run --scenario 5 --auto-approve
+uv run python -m agent.runbooks list | approve <name>
+caffeinate -dimsu uv run python -u -m benchmarks.run > benchmarks/run.log 2>&1
+uv run python -m tests.failsafe
 ```
 
 ## Progress
-- [x] Env: brew, Docker 29.6, Python 3.11 (uv), Ollama 0.40.12 + qwen3.5:4b, Anthropic key verified
-- [x] Scenarios 1–5 end-to-end. Hybrid warm: 1–4 on the fast path with the small model at $0. 5 escalates (2 roots), fixes in dependency order, and learns a combo runbook.
-- [x] Fast path + code-gathered evidence: MTTR s1 37→19s, s2 29→20s
-- [x] Failed-fix escalation, deny-then-approve, undo, learned runbooks
-- [x] Benchmark script (resumable, unattended); results in `benchmarks/results.md`
-- [ ] Small model can't label db_pool_exhaustion (says unknown/slow_queries), so scenario 5 always needs Sonnet to diagnose
-- [ ] Slow-queries variant of scenario 4 (lock-holding idle-in-transaction job → kill_idle_connections)
+- [x] Scenarios 0–6 end-to-end, hybrid / big-only / small-only, fast path, learning loop with human approval
+- [x] v1 benchmark (pre-audit) archived in `benchmarks/v1/`
+- [x] Overnight hardening: strict verify, hint removal, held-out scenario 6, control scenario 0, new metrics, safety (per-service risk, rolling restart, auto-undo, caps, runbook review), fresh-review audit fixes, fail-safe tests 5/5, invariants
+- [ ] v2 benchmark → `benchmarks/results.md`
 - [ ] Dashboard
