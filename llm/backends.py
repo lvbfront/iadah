@@ -84,9 +84,8 @@ class AnthropicBackend(LLMBackend):
             messages=[{"role": "user", "content": prompt}],
             betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kw,
         )
-        if msg.stop_reason == "refusal":
-            raise RuntimeError(f"refused: {msg.stop_details}")
-        text = "".join(b.text for b in msg.content if b.type == "text")
+        # A refusal is returned (and its tokens billed/logged) as empty text: callers treat it as invalid output.
+        text = "" if msg.stop_reason == "refusal" else "".join(b.text for b in msg.content if b.type == "text")
         u = msg.usage
         return LLMResult(text, msg.model, self.model, self.tier, u.input_tokens, u.output_tokens,
                          time.perf_counter() - t,

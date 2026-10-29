@@ -24,7 +24,7 @@ def wait_healthy(adapter, timeout=90) -> dict:
     t = time.time()
     while time.time() - t < timeout:
         h = adapter.get_health()
-        if all(x["status"] in stages.OK_STATUS and (x.get("app") or {}).get("error_rate", 0) <= 0.05
+        if all(x["status"] in stages.OK_STATUS and (x.get("app") or {}).get("error_rate", 0) == 0
                for x in h.values()):
             return h
         if not reset:
@@ -35,7 +35,9 @@ def wait_healthy(adapter, timeout=90) -> dict:
     raise SystemExit("system did not become healthy; check `docker compose ps` in demo/")
 
 
-def capture_baseline(adapter, samples=3) -> dict:
+def capture_baseline(adapter, samples=5) -> dict:
+    """Waits one full metrics window first, so the restart done by chaos.reset() isn't in the baseline."""
+    time.sleep(config.METRICS_WINDOW_S)
     acc = {}
     for _ in range(samples):
         for s, h in adapter.get_health().items():
@@ -58,10 +60,10 @@ def run(scenario: str | None, adapter=None) -> Incident:
         console.print(f"[dim]baseline {inc.baseline}; last-known-good configs saved[/]")
     console.rule(f"[bold]{inc.id}[/]  scenario={scenario or 'live'}  mode={config.MODE}")
 
+    inc.injected_at = time.time()  # clock starts BEFORE injection (some injections take seconds)
     if scenario:
         desc, inject = chaos.SCENARIOS[scenario]
         inject()
-    inc.injected_at = time.time()
     telemetry.start_incident(inc.id, inc.scenario, config.MODE, inc.injected_at)
     if scenario:
         telemetry.log_step(inc.id, "inject", note=f"chaos scenario {scenario}: {desc}")
@@ -86,7 +88,14 @@ def run(scenario: str | None, adapter=None) -> Incident:
         inc.iteration += 1
         if inc.iteration > 1:
             console.rule(f"[yellow]iteration {inc.iteration}[/]", style="yellow")
-            stages.detect(inc, adapter)  # refresh unhealthy/suspects after the failed fix
+            if not stages.detect(inc, adapter):  # refresh unhealthy/suspects after the failed fix
+                # Below alert thresholds but verify said not recovered: re-verify, never act on a healthy-looking system.
+                telemetry.log_step(inc.id, "detect", note="no alert after failed verify → re-verify only, no new actions")
+                stages.verify(inc, adapter)
+                if not inc.resolved:
+                    inc.needs_human = "degraded below alert thresholds but not back to baseline"
+                    telemetry.log_step(inc.id, "verify", tier="human", note=f"[red]stop[/]: {inc.needs_human}")
+                break
             stages.gather(inc, adapter)
         stages.route(inc, adapter)
         if not stages.fast_path(inc):

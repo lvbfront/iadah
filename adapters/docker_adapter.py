@@ -179,6 +179,9 @@ class DockerAdapter(Observability, Actions):
         if CONFIG_LABEL not in c.labels or not lkg.exists():
             raise RuntimeError(f"no last-known-good config for {service}")
         current, good = self._read_config(c), lkg.read_text()
+        age = time.time() - lkg.stat().st_mtime
+        if age > config.LKG_MAX_AGE_S:
+            raise RuntimeError(f"last-known-good config for {service} is {age / 3600:.1f}h old; refusing to roll back")
         if current == good:
             raise RuntimeError(f"{service} config already matches last-known-good")
         changed = [l.split("=")[0] for l in set(current.splitlines()) ^ set(good.splitlines()) if "=" in l]

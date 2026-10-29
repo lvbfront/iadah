@@ -24,7 +24,8 @@ import config
 OUT = Path(__file__).parent
 RESULTS = OUT / "results.csv"
 FIELDS = ["key", "scenario", "mode", "condition", "rep", "incident", "detected", "resolved", "still_ok",
-          "diag_correct", "correct_and_recovered", "diagnosed", "actions", "unnecessary_actions", "actions_taken",
+          "diag_correct", "diag_model_raw", "correct_and_recovered", "diagnosed", "diagnosed_raw", "actions",
+          "unnecessary_actions", "undone_actions", "actions_taken",
           "mttd_s", "mttr_s", "iterations", "escalations", "tokens", "big_tokens", "cost_usd", "invariant_violations",
           "sleep_gap_s", "invalid", "error"]
 STILL_OK_AFTER_S = 10   # re-check health this long after the agent declares recovery
@@ -77,10 +78,13 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
         tot = telemetry.totals(inc.id)
         roots = {(r["incident_type"], r["service"]) for r in inc.roots}
         detected = bool(inc.detected_at)
-        acts = [(a["action"], a["service"]) for a in inc.actions_taken]
-        truth_svcs = {svc for _, svc in chaos.TRUTH[scenario]}
-        # unnecessary = touching a service that isn't a true root, or repeating the same action on it
-        unnecessary = sum(1 for i, a in enumerate(acts) if a[1] not in truth_svcs or a in acts[:i])
+        # every executed action counts, including ones that were later reverted
+        acts = [(a["action"], a["service"]) for a in inc.actions_taken + inc.undone]
+        expected = chaos.EXPECTED_ACTIONS[scenario]
+        # unnecessary = not a proportionate fix for this scenario, a repeat, or an action that had to be reverted
+        unnecessary = sum(1 for i, a in enumerate(acts) if a not in expected or a in acts[:i]) + \
+            sum(1 for a in inc.undone if (a["action"], a["service"]) in expected)
+        raw = {(r["incident_type"], r["service"]) for r in inc.model_roots}
         if scenario == "0":  # control: success = nothing detected, nothing touched
             resolved = still_ok = int(not detected and not acts)
         else:
@@ -93,6 +97,9 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
         row |= {
             "incident": inc.id, "detected": int(detected), "resolved": resolved, "still_ok": still_ok,
             "diag_correct": diag,
+            "diag_model_raw": int(chaos.diag_correct(scenario, raw)) if detected else int(scenario == "0"),
+            "diagnosed_raw": ";".join(f"{t}@{s}" for t, s in sorted(raw)) or "none",
+            "undone_actions": len(inc.undone),
             "correct_and_recovered": int(diag and resolved and still_ok and not getattr(inc, "violations", [])),
             "actions": len(acts), "unnecessary_actions": unnecessary,
             "actions_taken": ";".join(f"{a}({s})" for a, s in acts),
@@ -136,7 +143,8 @@ def report():
     control = [r for r in rows if r["scenario"] == "0"]
 
     def stats(rs):
-        return [len(rs), pct(r["diag_correct"] for r in rs), pct(r["resolved"] for r in rs),
+        return [len(rs), pct(r["diag_correct"] for r in rs), pct(r["diag_model_raw"] or 0 for r in rs),
+                pct(r["resolved"] for r in rs),
                 pct(r["correct_and_recovered"] for r in rs), mean(r["mttr_s"] for r in rs if r["resolved"] == "1"),
                 mean((r["actions"] or 0 for r in rs), 2), mean((r["unnecessary_actions"] or 0 for r in rs), 2),
                 mean((r["escalations"] or 0 for r in rs), 2), mean((r["cost_usd"] or 0 for r in rs), 4),
@@ -148,7 +156,7 @@ def report():
             g.setdefault(key(r), []).append(r)
         return sorted(g.items(), key=lambda kv: tuple(order.get(k, k) for k in kv[0]))
 
-    head = ["runs", "diag accuracy", "recovered", "correct & recovered", "MTTR s", "actions/inc", "unnecessary/inc",
+    head = ["runs", "diag accuracy", "model-raw diag", "recovered", "correct & recovered", "MTTR s", "actions/inc", "unnecessary/inc",
             "escalations", "cost/run $", "total $"]
     rollup = [[m, c, *stats(rs)] for (m, c), rs in grouped(faults, lambda r: (r["mode"], r["condition"]))]
     table = [[s_, m, c, *stats(rs), mean(r["mttd_s"] for r in rs)]
@@ -163,7 +171,9 @@ def report():
 
     md = ["# Benchmark results", "",
           f"{len(rows)} valid runs ({invalid} discarded: machine slept > {SLEEP_GAP_LIMIT_S}s mid-run, rerun). "
-          "Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). MTTR averages resolved runs "
+          "Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the "
+          "agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes "
+          "before any rule filtering. MTTR averages resolved runs "
           f"only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy {STILL_OK_AFTER_S}s "
           "later. **unnecessary** = an action on a service that is not a true root, or a repeated action. "
           "cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).", "",

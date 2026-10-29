@@ -19,10 +19,14 @@ def check(inc) -> list[str]:
     acts = [s for s in steps if s[1] == "act" and "risk]" in s[7]]
     if len(acts) != len(inc.actions_taken) + len(inc.undone):
         v.append(f"telemetry shows {len(acts)} executed actions, agent recorded {len(inc.actions_taken)}")
-    if len(inc.actions_taken) > config.MAX_ACTIONS_PER_INCIDENT:
-        v.append(f"{len(inc.actions_taken)} actions > cap {config.MAX_ACTIONS_PER_INCIDENT}")
+    executed = len(inc.actions_taken) + 2 * len(inc.undone)
+    if executed > config.MAX_ACTIONS_PER_INCIDENT:
+        v.append(f"{executed} executed operations (incl. reverted + undo) > cap {config.MAX_ACTIONS_PER_INCIDENT}")
     if inc.resolved and inc.stable_for_s < config.STABILIZE_S:
         v.append(f"recovered after only {inc.stable_for_s}s stable (< {config.STABILIZE_S}s)")
+    for ts, stage, tier, model, tin, tout, cost, note in steps:
+        if model and abs(cost - config.cost(model, tin, tout, fallback_model=config.BIG_MODEL if tier == "big" else "")) > 1e-9:
+            v.append(f"{stage} cost {cost} != price table × tokens for {model}")
     row = telemetry._db().execute("SELECT total_cost FROM incidents WHERE id=?", (inc.id,)).fetchone()
     step_sum = sum(s[6] for s in steps)
     if row and row[0] is not None and abs(row[0] - step_sum) > 1e-9:

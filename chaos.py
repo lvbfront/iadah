@@ -6,7 +6,7 @@ import time
 from pathlib import Path
 
 DEMO = Path(__file__).parent / "demo"
-CFG = DEMO / "config" / "app.env"
+CFG = DEMO / "config" / "api" / "app.env"  # the api's own config (the worker has a separate copy)
 PREV = CFG.with_suffix(".env.prev")  # what a rollback restores
 
 
@@ -108,6 +108,20 @@ TRUTH = {
     "4": {("disk_full", "api")},
     "5": {("cache_down", "cache"), ("db_pool_exhaustion", "db")},
     "6": {("*", "api")},
+}
+
+
+# Actions that are a correct, proportionate fix. Anything else (or a repeat) counts as unnecessary.
+# Deliberately strict: e.g. restart(db) also clears scenario 5's connections but is disruptive on a stateful
+# service; restart(api) also empties scenario 4's tmpfs but throws away everything else on it.
+EXPECTED_ACTIONS = {
+    "0": set(),
+    "1": {("restart", "cache")},
+    "2": {("rollback_config", "api")},
+    "3": {("restart", "worker"), ("scale", "worker")},
+    "4": {("clear_disk", "api")},
+    "5": {("restart", "cache"), ("kill_idle_connections", "db")},
+    "6": {("rollback_config", "api")},
 }
 
 

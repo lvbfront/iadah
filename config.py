@@ -33,6 +33,8 @@ DETECT_WINDOW_S = 90        # give up waiting for a detection after this long
 CONTROL_WINDOW_S = 60       # scenario 0 (no fault): watch a healthy system this long
 MAX_ACTIONS_PER_INCIDENT = 6  # hard cap; reaching it hands the incident to a human
 MAX_PLAN_STEPS = 4            # longer plans are truncated
+METRICS_WINDOW_S = 10        # the demo api's /metrics window
+LKG_MAX_AGE_S = 6 * 3600      # rollback_config refuses a last-known-good config older than this
 ACTION_SETTLE_S = 5           # wait after an action before comparing health with the pre-action state
 ALERT_GROUP_S = 3          # after the first alert, wait this long and re-detect to group related alerts
 
@@ -42,5 +44,7 @@ AUTO_APPROVE = False
 
 
 def cost(model: str, in_tok: int, out_tok: int, fallback_model: str = "") -> float:
-    pin, pout = PRICING.get(model) or PRICING.get(fallback_model, (0.0, 0.0))
+    """Local models (no entry, no fallback) cost 0. An unknown cloud model is priced at the most expensive
+    known rate, so cost is never underreported."""
+    pin, pout = PRICING.get(model) or (max(PRICING.values()) if fallback_model else (0.0, 0.0))
     return (in_tok * pin + out_tok * pout) / 1_000_000

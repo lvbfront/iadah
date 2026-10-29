@@ -4,13 +4,13 @@ name: demo
 
 x-app: &app
   build: ./app
-  volumes: ["./config:/config"]
   restart: "no"
 
 services:
   api:
     <<: *app
     ports: ["8000:8000"]
+    volumes: ["./config/api:/config"]       # per-service config: a rollback never touches another service
     mem_limit: 256m
     tmpfs: ["/data:size=16m"]
     labels:
@@ -28,6 +28,7 @@ services:
   worker:
     <<: *app
     command: ["python", "worker.py"]
+    volumes: ["./config/worker:/config"]
     mem_limit: 256m
     labels: {recovery.depends_on: "db,cache", recovery.config_path: "/config/app.env"}
     depends_on: {db: {condition: service_healthy}, cache: {condition: service_started}}

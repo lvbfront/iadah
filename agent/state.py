@@ -27,6 +27,7 @@ class Incident:
     diagnosis: dict = field(default_factory=dict)
     root_service: str = ""                             # primary root cause service
     roots: list[dict] = field(default_factory=list)    # every root cause: [{"incident_type", "service"}]
+    model_roots: list[dict] = field(default_factory=list)  # raw model root_causes before the topology filter
     plan: list[dict] = field(default_factory=list)     # [{"action", "service", "reason"}]
     plan_source: str = ""                              # "runbook:<name>" | "model"
     actions_taken: list[dict] = field(default_factory=list)  # adapter action records (with undo info)

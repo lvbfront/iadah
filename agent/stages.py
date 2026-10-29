@@ -72,7 +72,7 @@ def _route(inc: Incident, tier: str, reason: str):
     telemetry.log_step(inc.id, "route", note=f"→ [bold]{tier}[/]: {reason}")
 
 
-def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, summarize, check=None):
+def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, summarize, check=None, hint: str = ""):
     """Call the tier's model for schema-valid JSON. Retry once on invalid output, then escalate
     (router decides; in small-only mode there's nowhere to go). Returns (data|None, tier)."""
     while True:
@@ -92,7 +92,7 @@ def ask_json(inc: Incident, stage: str, tier: str, prompt: str, schema: dict, su
             if ok:
                 return data, tier
             # Same prompt at temperature 0 would fail the same way: tell the model what went wrong.
-            p = (prompt + f"\n\nYour previous reply was invalid:\n{r.text[:300]}\n"
+            p = (prompt + f"\n\nYour previous reply was invalid:\n{r.text[:300]}\n{hint}\n"
                  f"Reply with one JSON object with exactly these keys filled in: {schema.get('required')}")
         new, reason = pick_tier(invalid_output=True)
         if new == tier:
@@ -260,6 +260,10 @@ def fast_path(inc: Incident) -> bool:
     """High-confidence triage of a known signature: skip investigate + diagnose."""
     if inc.iteration > 1 or is_ambiguous(inc) or not _known(inc, inc.triage):
         return False
+    if {rc["service"] for rc in inc.triage["root_causes"]} != set(inc.suspects):
+        telemetry.log_step(inc.id, "fast-path", note=f"no fast path: triage roots "
+                           f"{sorted({rc['service'] for rc in inc.triage['root_causes']})} ≠ topology suspects {inc.suspects}")
+        return False
     inc.fast_path = True
     inc.diagnosis = inc.triage | {"hypotheses": []}
     _resolve_roots(inc)
@@ -269,27 +273,33 @@ def fast_path(inc: Incident) -> bool:
     return True
 
 
+def roots_consistent(inc: Incident, d: dict) -> bool:
+    """A diagnosis is only acted on if it agrees with the observed state: every root cause names an
+    unhealthy service, and at least one of them is not a topology symptom. A mismatch is treated like
+    invalid output (retry once, then escalate / hand to a human); it is NEVER silently rewritten."""
+    rcs = d.get("root_causes") or []
+    return bool(rcs) and all(rc["service"] in inc.unhealthy for rc in rcs) and \
+        any(rc["service"] not in inc.symptoms for rc in rcs)
+
+
+def consistency_hint(inc: Incident) -> str:
+    return (f"Constraint: every root_causes service must be one of the unhealthy services {sorted(inc.unhealthy)}, "
+            f"and at least one must not be a dependency symptom {inc.symptoms}.")
+
+
 def _resolve_roots(inc: Incident):
-    """Guard: each fix target must actually be unhealthy; otherwise use an unclaimed topology suspect."""
+    """Roots = the diagnosis' root causes minus topology symptoms (diagnosis already passed roots_consistent)."""
     d = inc.diagnosis
-    rcs = [rc for rc in d.get("root_causes", []) if rc["incident_type"] != "unknown"] or \
-          [{"incident_type": d["incident_type"], "service": d["root_cause_service"]}]
-    roots, claimed = [], set()
-    for rc in rcs:
-        svc = rc["service"]
-        if svc not in inc.unhealthy:
-            free = [s for s in inc.suspects if s not in claimed and s not in {r["service"] for r in rcs}]
-            if free:
-                telemetry.log_step(inc.id, "diagnose", note=f"root {svc} is healthy → using topology suspect {free[0]}")
-                svc = free[0]
-        claimed.add(svc)
-        roots.append({"incident_type": rc["incident_type"], "service": svc})
-    inc.roots = roots
-    inc.root_service = roots[0]["service"]
+    inc.model_roots = d.get("raw_root_causes", d.get("root_causes", []))
+    inc.roots = [{"incident_type": rc["incident_type"], "service": rc["service"]}
+                 for rc in d["root_causes"] if rc["service"] not in inc.symptoms]
+    inc.root_service = inc.roots[0]["service"]
 
 
 def _drop_symptom_roots(inc: Incident, d: dict | None):
     """A service failing only because a dependency failed is a symptom, never a root cause."""
+    if d:
+        d.setdefault("raw_root_causes", [dict(rc) for rc in d.get("root_causes", [])])
     if d and inc.symptoms:
         keep = [rc for rc in d.get("root_causes", []) if rc["service"] not in inc.symptoms]
         if len(keep) < len(d.get("root_causes", [])):
@@ -309,7 +319,7 @@ def triage(inc: Incident, obs):
     data, _ = ask_json(inc, "triage", tier, prompt, S.triage_schema(services),
                        lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                  f"conf={d['confidence']:.2f} sev={d['severity']}",
-                       check=lambda d: 0 <= d["confidence"] <= 1)
+                       check=lambda d: 0 <= d["confidence"] <= 1 and roots_consistent(inc, d), hint=consistency_hint(inc))
     inc.triage = _drop_symptom_roots(inc, data) or {"incident_type": "unknown", "severity": "high", "affected_services": list(inc.unhealthy),
                           "suspected_root_cause": "triage failed", "confidence": 0.0,
                           "root_cause_service": (inc.suspects or services)[0], "root_causes": [], "evidence": []}
@@ -367,12 +377,13 @@ def diagnose(inc: Incident, obs):
     prompt = S.DIAGNOSE_PROMPT.format(types=S.TYPES_TEXT, pack=pack)
 
     def ok(d):
-        return 0 <= d["confidence"] <= 1 and all(0 <= h["likelihood"] <= 1 for h in d["hypotheses"])
+        return (0 <= d["confidence"] <= 1 and all(0 <= h["likelihood"] <= 1 for h in d["hypotheses"])
+                and roots_consistent(inc, d))
 
     d, inc.tier = ask_json(inc, "diagnose", inc.tier, prompt, S.diagnose_schema(services),
                            lambda d: f"roots={[(r['incident_type'], r['service']) for r in d['root_causes']]} "
                                      f"conf={d['confidence']:.2f} — {d['suspected_root_cause'][:80]} "
-                                     f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok)
+                                     f"[dim](pack ~{est_tokens(pack)} tok)[/]", ok, hint=consistency_hint(inc))
     if d is None:  # fail safe: never act on a diagnosis no model could produce
         inc.needs_human = "no valid diagnosis (model unavailable or invalid output)"
         telemetry.log_step(inc.id, "diagnose", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
@@ -438,6 +449,11 @@ def plan(inc: Incident, obs):
                            + " → ".join(f"{x['action']}({x['service']})[d{depth(topo, x['service'])}]" for x in inc.plan))
 
 
+def executed_actions(inc: Incident) -> int:
+    """Every operation run against the system: kept actions, reverted actions, and the undo operations."""
+    return len(inc.actions_taken) + 2 * len(inc.undone)
+
+
 def risk_of(action: str, svc: str, obs) -> str:
     """Risk per action AND service: disruptive actions on a stateful service are always high risk."""
     risk = S.ALLOWLIST[action][0]
@@ -457,7 +473,7 @@ def act(inc: Incident, obs):
         if a not in S.ALLOWLIST:
             telemetry.log_step(inc.id, "act", note=f"[red]blocked[/] {a}({svc}): not allowlisted")
             continue
-        if len(inc.actions_taken) + len(done) >= config.MAX_ACTIONS_PER_INCIDENT:
+        if executed_actions(inc) + len(done) >= config.MAX_ACTIONS_PER_INCIDENT:
             inc.needs_human = f"action cap {config.MAX_ACTIONS_PER_INCIDENT} reached"
             telemetry.log_step(inc.id, "act", tier="human", note=f"[red]stop[/]: {inc.needs_human} → handing to a human")
             break
@@ -532,11 +548,11 @@ def verify(inc: Incident, obs):
             streak, since, mem0 = 0, None, {}
         else:
             streak += 1
-            since = since or time.time()
-            if streak >= config.STABLE_POLLS and time.time() - since >= config.STABILIZE_S:
+            since = since or time.perf_counter()  # monotonic: machine sleep doesn't count as "stable"
+            if streak >= config.STABLE_POLLS and time.perf_counter() - since >= config.STABILIZE_S:
                 break
         time.sleep(config.VERIFY_POLL_S)
-    inc.stable_for_s = round(time.time() - since, 1) if since else 0.0
+    inc.stable_for_s = round(time.perf_counter() - since, 1) if since else 0.0
     inc.resolved = (not report and streak >= config.STABLE_POLLS and inc.stable_for_s >= config.STABILIZE_S)
     if not report and not inc.resolved:
         report = {"*": f"healthy for only {inc.stable_for_s}s / {streak} polls before timeout"}
@@ -563,14 +579,16 @@ def postmortem(inc: Incident, obs):
     # Learn from every action that ran across all iterations, not just the last one.
     learned = list({(a["action"], a["service"]): a for a in inc.actions_taken}.values())
     if inc.resolved and sig != ["unknown"] and learned:
-        hit = _runbook(sig, approved_only=False)
-        if inc.plan_source.startswith("runbook:") and hit:
-            path, rb = hit
+        used = Path(config.RUNBOOKS_DIR) / f"{inc.plan_source.removeprefix('runbook:')}.yaml"
+        if inc.plan_source.startswith("runbook:") and used.exists():
+            path, rb = used, yaml.safe_load(used.read_text())
             rb["times_used"] = rb.get("times_used", 0) + 1
             rb["last_used"] = inc.id
             inc.runbook_saved = f"{path.name} (times_used={rb['times_used']})"
         else:
-            path = hit[0] if hit else Path(config.RUNBOOKS_DIR) / f"{t}.yaml"
+            # Learned runbooks go to their own pending file; approved/seed runbooks are never overwritten.
+            path = Path(config.RUNBOOKS_DIR) / f"{t}.learned.yaml"
+            hit = path.exists()
             svc_type = {r["service"]: r["incident_type"] for r in inc.roots}
             rb = {"name": t.replace("_", "-"), "signature": {"incident_types": sig},
                   "description": d.get("suspected_root_cause", ""),

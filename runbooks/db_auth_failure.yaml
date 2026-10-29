@@ -1,9 +1,12 @@
 name: db-auth-failure
 signature:
-  incident_types: [db_auth_failure]
-description: A client's DB credentials are wrong (typically a bad config deploy); DB itself is healthy.
+  incident_types:
+  - db_auth_failure
+description: A client's DB credentials are wrong (typically a bad config deploy);
+  DB itself is healthy.
 actions:
-- {action: rollback_config, service: $root:db_auth_failure}
+- action: rollback_config
+  service: $root:db_auth_failure
 source: seed
 status: approved
 times_used: 0
