@@ -1,0 +1,60 @@
+# Benchmark results
+
+90 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH`. MTTR averages resolved runs only. cold = no runbooks, warm = seed runbooks (none for scenario 5).
+
+## By mode × condition
+
+| mode | condition | runs | diag accuracy | recovered | MTTR s | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|
+| hybrid | cold | 15 | 100% | 100% | 39.6 | 1.0 | 0.0157 | 0.235 |
+| hybrid | warm | 15 | 100% | 100% | 32.9 | 0.2 | 0.0045 | 0.067 |
+| big-only | cold | 15 | 100% | 100% | 41.5 | 0.0 | 0.0326 | 0.489 |
+| big-only | warm | 15 | 100% | 100% | 36.8 | 0.0 | 0.0229 | 0.344 |
+| small-only | cold | 15 | 80% | 100% | 59.4 | 0.0 | 0.0 | 0.0 |
+| small-only | warm | 15 | 80% | 100% | 46.4 | 0.0 | 0.0 | 0.0 |
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | recovered | MTTD s | MTTR s | escalations | tokens | big tokens | cost $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | cold | 3 | 100% | 100% | 0.1 | 30.5 | 1.0 | 6615 | 5005 | 0.0153 |
+| 1 | hybrid | warm | 3 | 100% | 100% | 0.1 | 22.3 | 0.0 | 1594 | 0 | 0.0 |
+| 1 | big-only | cold | 3 | 100% | 100% | 0.1 | 24.6 | 0.0 | 7742 | 7742 | 0.0227 |
+| 1 | big-only | warm | 3 | 100% | 100% | 0.1 | 17.9 | 0.0 | 2716 | 2716 | 0.0077 |
+| 1 | small-only | cold | 3 | 100% | 100% | 0.1 | 38.8 | 0.0 | 4864 | 0 | 0.0 |
+| 1 | small-only | warm | 3 | 100% | 100% | 0.1 | 22.1 | 0.0 | 1618 | 0 | 0.0 |
+| 2 | hybrid | cold | 3 | 100% | 100% | 3.0 | 32.0 | 1.0 | 6200 | 4724 | 0.0145 |
+| 2 | hybrid | warm | 3 | 100% | 100% | 3.3 | 21.8 | 0.0 | 1481 | 0 | 0.0 |
+| 2 | big-only | cold | 3 | 100% | 100% | 3.4 | 27.1 | 0.0 | 7279 | 7279 | 0.0214 |
+| 2 | big-only | warm | 3 | 100% | 100% | 3.0 | 19.2 | 0.0 | 2521 | 2521 | 0.0072 |
+| 2 | small-only | cold | 3 | 100% | 100% | 3.0 | 33.9 | 0.0 | 3888 | 0 | 0.0 |
+| 2 | small-only | warm | 3 | 100% | 100% | 2.6 | 21.5 | 0.0 | 1479 | 0 | 0.0 |
+| 3 | hybrid | cold | 3 | 100% | 100% | 21.1 | 40.0 | 1.0 | 5355 | 4133 | 0.0126 |
+| 3 | hybrid | warm | 3 | 100% | 100% | 21.1 | 33.5 | 0.0 | 1221 | 0 | 0.0 |
+| 3 | big-only | cold | 3 | 100% | 100% | 21.0 | 47.7 | 0.0 | 11220 | 11220 | 0.0348 |
+| 3 | big-only | warm | 3 | 100% | 100% | 21.1 | 45.0 | 0.0 | 9208 | 9208 | 0.0296 |
+| 3 | small-only | cold | 3 | 100% | 100% | 20.9 | 45.2 | 0.0 | 3403 | 0 | 0.0 |
+| 3 | small-only | warm | 3 | 100% | 100% | 21.0 | 33.4 | 0.0 | 1217 | 0 | 0.0 |
+| 4 | hybrid | cold | 3 | 100% | 100% | 29.1 | 58.4 | 1.0 | 6010 | 4543 | 0.0136 |
+| 4 | hybrid | warm | 3 | 100% | 100% | 28.8 | 51.4 | 0.0 | 1468 | 0 | 0.0 |
+| 4 | big-only | cold | 3 | 100% | 100% | 28.9 | 54.4 | 0.0 | 7129 | 7129 | 0.021 |
+| 4 | big-only | warm | 3 | 100% | 100% | 28.8 | 48.0 | 0.0 | 2447 | 2447 | 0.007 |
+| 4 | small-only | cold | 3 | 100% | 100% | 28.6 | 63.8 | 0.0 | 3926 | 0 | 0.0 |
+| 4 | small-only | warm | 3 | 100% | 100% | 28.9 | 51.5 | 0.0 | 1468 | 0 | 0.0 |
+| 5 | hybrid | cold | 3 | 100% | 100% | 0.1 | 37.2 | 1.0 | 7509 | 5885 | 0.0224 |
+| 5 | hybrid | warm | 3 | 100% | 100% | 0.1 | 35.2 | 1.0 | 7485 | 5862 | 0.0223 |
+| 5 | big-only | cold | 3 | 100% | 100% | 0.1 | 53.5 | 0.0 | 18153 | 18153 | 0.063 |
+| 5 | big-only | warm | 3 | 100% | 100% | 0.1 | 54.0 | 0.0 | 17264 | 17264 | 0.0631 |
+| 5 | small-only | cold | 3 | 0% | 100% | 0.1 | 115.4 | 0.0 | 10739 | 0 | 0.0 |
+| 5 | small-only | warm | 3 | 0% | 100% | 0.1 | 103.7 | 0.0 | 8975 | 0 | 0.0 |
+
+## Where small-only fails
+
+| run | resolved | diagnosed | truth | error |
+|---|---|---|---|---|
+| s5-small-only-cold-1 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
+| s5-small-only-warm-1 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
+| s5-small-only-cold-2 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
+| s5-small-only-warm-2 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
+| s5-small-only-cold-3 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
+| s5-small-only-warm-3 | 1 | cache_down@db | cache_down@cache;db_pool_exhaustion@db |  |
