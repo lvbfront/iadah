@@ -33,8 +33,8 @@ class LLMBackend:
 class OllamaBackend(LLMBackend):
     tier = "small"
 
-    def __init__(self, model=config.SMALL_MODEL, url=config.OLLAMA_URL):
-        self.model, self.url = model, url
+    def __init__(self, model=None, url=None):
+        self.model, self.url = model or config.SMALL_MODEL, url or config.OLLAMA_URL  # read at construction
 
     def complete(self, prompt, system="", max_tokens=2048, schema=None):
         if schema:

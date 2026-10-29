@@ -12,7 +12,7 @@ def pick_tier(*, confidence: float = 1.0, root_causes: int = 1, seen_before: boo
     if config.MODE == "small-only":
         return "small", "mode=small-only"
     if invalid_output:
-        return "big", "small model returned invalid JSON twice"
+        return "big", "small model failed twice (error or invalid output)"
     if failed_fix:
         return "big", "previous fix failed"
     if unknown:
