@@ -18,13 +18,21 @@ def redis_down():
     compose("stop", "cache")
 
 
-def bad_db_password():
-    """Simulates a deploy that ships a wrong DB password to the api."""
+def _bad_deploy(key: str, value: str):
+    """A deploy ships one wrong config value to the api (previous config kept for reset)."""
     shutil.copy(CFG, PREV)
-    text = "\n".join("DB_PASSWORD=wrong-after-deploy" if l.startswith("DB_PASSWORD=") else l
-                     for l in CFG.read_text().splitlines())
+    text = "\n".join(f"{key}={value}" if l.startswith(f"{key}=") else l for l in CFG.read_text().splitlines())
     CFG.write_text(text + "\n")
     compose("restart", "api")
+
+
+def bad_db_password():
+    _bad_deploy("DB_PASSWORD", "wrong-after-deploy")
+
+
+def bad_redis_host():
+    """HELD-OUT scenario: never used to tune prompts or runbooks."""
+    _bad_deploy("REDIS_HOST", "cache-v2")
 
 
 def worker_memory_leak():
@@ -83,17 +91,29 @@ SCENARIOS = {
     "3": ("worker memory leak", worker_memory_leak),
     "4": ("disk fill on api scratch volume", disk_fill),
     "5": ("redis down + DB connection exhaustion", redis_down_and_db_exhaustion),
+    "6": ("HELD-OUT: wrong REDIS_HOST in api config after deploy", bad_redis_host),
     "reset": ("restore healthy state", reset),
 }
 
-# Ground truth root causes per scenario: {(incident_type, service)} — used by benchmarks/run.py
+# Ground truth root causes per scenario: {(incident_type, service)} — used by benchmarks/run.py.
+# "*" = any incident type: scenario 6's fault (a wrong cache hostname in the api's config) has no matching
+# type in the vocabulary, and we deliberately did not add one. It is graded on locating the root at the api
+# (the cache itself is healthy; any real fix must target the api's config).
 TRUTH = {
     "1": {("cache_down", "cache")},
     "2": {("db_auth_failure", "api")},
     "3": {("memory_leak", "worker")},
     "4": {("disk_full", "api")},
     "5": {("cache_down", "cache"), ("db_pool_exhaustion", "db")},
+    "6": {("*", "api")},
 }
+
+
+def diag_correct(scenario: str, roots: set[tuple[str, str]]) -> bool:
+    truth = TRUTH[scenario]
+    if len(roots) != len(truth):
+        return False
+    return all(any(s == ts and (tt == "*" or t == tt) for tt, ts in truth) for t, s in roots)
 
 if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "list"
