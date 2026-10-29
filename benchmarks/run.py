@@ -23,9 +23,11 @@ import config
 
 OUT = Path(__file__).parent
 RESULTS = OUT / "results.csv"
-FIELDS = ["key", "scenario", "mode", "condition", "rep", "incident", "resolved", "diag_correct", "diagnosed",
-          "mttd_s", "mttr_s", "iterations", "escalations", "tokens", "big_tokens", "cost_usd", "sleep_gap_s",
-          "invalid", "error"]
+FIELDS = ["key", "scenario", "mode", "condition", "rep", "incident", "detected", "resolved", "still_ok",
+          "diag_correct", "correct_and_recovered", "diagnosed", "actions", "unnecessary_actions", "actions_taken",
+          "mttd_s", "mttr_s", "iterations", "escalations", "tokens", "big_tokens", "cost_usd", "invariant_violations",
+          "sleep_gap_s", "invalid", "error"]
+STILL_OK_AFTER_S = 10   # re-check health this long after the agent declares recovery
 SLEEP_GAP_LIMIT_S = 60  # wall clock ahead of the monotonic clock by more than this = machine slept → rerun
 MAX_ATTEMPTS = 3
 
@@ -58,6 +60,8 @@ def runbook_dir(condition: str) -> str:
 
 def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
     import telemetry
+    from adapters.docker_adapter import DockerAdapter
+    from agent import stages
     from agent.run import run
     key = f"s{scenario}-{mode}-{condition}-{rep}"
     row = {"key": key, "scenario": scenario, "mode": mode, "condition": condition, "rep": rep, "error": ""}
@@ -68,11 +72,30 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
     # macOS: perf_counter stops while the machine sleeps, time.time() doesn't → the difference is sleep time
     wall0, mono0 = time.time(), time.perf_counter()
     try:
-        inc = run(scenario)
+        adapter = DockerAdapter()
+        inc = run(scenario, adapter)
         tot = telemetry.totals(inc.id)
         roots = {(r["incident_type"], r["service"]) for r in inc.roots}
+        detected = bool(inc.detected_at)
+        acts = [(a["action"], a["service"]) for a in inc.actions_taken]
+        truth_svcs = {svc for _, svc in chaos.TRUTH[scenario]}
+        # unnecessary = touching a service that isn't a true root, or repeating the same action on it
+        unnecessary = sum(1 for i, a in enumerate(acts) if a[1] not in truth_svcs or a in acts[:i])
+        if scenario == "0":  # control: success = nothing detected, nothing touched
+            resolved = still_ok = int(not detected and not acts)
+        else:
+            resolved = int(inc.resolved)
+            still_ok = 0
+            if resolved:  # stays recovered after the agent walks away?
+                time.sleep(STILL_OK_AFTER_S)
+                still_ok = int(not stages.flags(adapter.get_health(), inc.baseline, strict=True))
+        diag = int(chaos.diag_correct(scenario, roots)) if detected or scenario == "0" else 0
         row |= {
-            "incident": inc.id, "resolved": int(inc.resolved), "diag_correct": int(roots == chaos.TRUTH[scenario]),
+            "incident": inc.id, "detected": int(detected), "resolved": resolved, "still_ok": still_ok,
+            "diag_correct": diag, "correct_and_recovered": int(diag and resolved and still_ok),
+            "actions": len(acts), "unnecessary_actions": unnecessary,
+            "actions_taken": ";".join(f"{a}({s})" for a, s in acts),
+            "invariant_violations": "; ".join(getattr(inc, "violations", [])),
             "diagnosed": ";".join(f"{t}@{s}" for t, s in sorted(roots)) or "none",
             "mttd_s": round(inc.detected_at - inc.injected_at, 1) if inc.detected_at else "",
             "mttr_s": round(inc.recovered_at - inc.injected_at, 1) if inc.recovered_at else "",
@@ -82,7 +105,7 @@ def one(scenario: str, mode: str, condition: str, rep: int) -> dict:
         }
     except Exception as e:
         traceback.print_exc(file=log)
-        row |= {"resolved": 0, "diag_correct": 0, "error": f"{type(e).__name__}: {e}"[:200]}
+        row |= {"resolved": 0, "diag_correct": 0, "correct_and_recovered": 0, "error": f"{type(e).__name__}: {e}"[:200]}
     finally:
         gap = (time.time() - wall0) - (time.perf_counter() - mono0)
         row |= {"sleep_gap_s": round(gap, 1), "invalid": int(gap > SLEEP_GAP_LIMIT_S)}
@@ -107,44 +130,56 @@ def report():
         allrows = list(csv.DictReader(f))
     rows = [r for r in allrows if r["invalid"] != "1"]
     invalid = len(allrows) - len(rows)
-    groups: dict[tuple, list] = {}
-    for r in rows:
-        groups.setdefault((r["scenario"], r["mode"], r["condition"]), []).append(r)
     order = {"hybrid": 0, "big-only": 1, "small-only": 2}
-    cols = ["scenario", "mode", "condition", "runs", "diag accuracy", "recovered", "MTTD s", "MTTR s",
-            "escalations", "tokens", "big tokens", "cost $"]
-    table = []
-    for (s, m, c), rs in sorted(groups.items(), key=lambda kv: (kv[0][0], order[kv[0][1]], kv[0][2])):
-        table.append([s, m, c, len(rs), pct(r["diag_correct"] for r in rs), pct(r["resolved"] for r in rs),
-                      mean(r["mttd_s"] for r in rs), mean(r["mttr_s"] for r in rs if r["resolved"] == "1"),
-                      mean((r["escalations"] for r in rs), 2), mean((r["tokens"] for r in rs), 0),
-                      mean((r["big_tokens"] for r in rs), 0), mean((r["cost_usd"] for r in rs), 4)])
-    # roll-up per mode × condition
-    roll = {}
-    for r in rows:
-        roll.setdefault((r["mode"], r["condition"]), []).append(r)
-    rollup = [[m, c, len(rs), pct(r["diag_correct"] for r in rs), pct(r["resolved"] for r in rs),
-               mean(r["mttr_s"] for r in rs if r["resolved"] == "1"), mean((r["escalations"] for r in rs), 2),
-               mean((r["cost_usd"] for r in rs), 4), round(sum(float(r["cost_usd"] or 0) for r in rs), 3)]
-              for (m, c), rs in sorted(roll.items(), key=lambda kv: (order[kv[0][0]], kv[0][1]))]
-    fails = [r for r in rows if r["mode"] == "small-only" and (r["resolved"] != "1" or r["diag_correct"] != "1")]
+    faults = [r for r in rows if r["scenario"] != "0"]
+    control = [r for r in rows if r["scenario"] == "0"]
+
+    def stats(rs):
+        return [len(rs), pct(r["diag_correct"] for r in rs), pct(r["resolved"] for r in rs),
+                pct(r["correct_and_recovered"] for r in rs), mean(r["mttr_s"] for r in rs if r["resolved"] == "1"),
+                mean((r["actions"] or 0 for r in rs), 2), mean((r["unnecessary_actions"] or 0 for r in rs), 2),
+                mean((r["escalations"] or 0 for r in rs), 2), mean((r["cost_usd"] or 0 for r in rs), 4),
+                round(sum(float(r["cost_usd"] or 0) for r in rs), 3)]
+
+    def grouped(rs, key):
+        g = {}
+        for r in rs:
+            g.setdefault(key(r), []).append(r)
+        return sorted(g.items(), key=lambda kv: tuple(order.get(k, k) for k in kv[0]))
+
+    head = ["runs", "diag accuracy", "recovered", "correct & recovered", "MTTR s", "actions/inc", "unnecessary/inc",
+            "escalations", "cost/run $", "total $"]
+    rollup = [[m, c, *stats(rs)] for (m, c), rs in grouped(faults, lambda r: (r["mode"], r["condition"]))]
+    table = [[s_, m, c, *stats(rs), mean(r["mttd_s"] for r in rs)]
+             for (s_, m, c), rs in grouped(rows, lambda r: (r["scenario"], r["mode"], r["condition"]))]
+    cols = ["scenario", "mode", "condition", *head, "MTTD s"]
+    ctrl = [[m, len(rs), sum(int(r["detected"] or 0) for r in rs), sum(int(r["actions"] or 0) for r in rs)]
+            for (m,), rs in grouped(control, lambda r: (r["mode"],))]
+    fails = [r for r in faults if r["mode"] == "small-only" and r["correct_and_recovered"] != "1"]
+    viol = [r for r in rows if r["invariant_violations"]]
+    errs = [r for r in rows if r["error"]]
+    line = lambda r: "| " + " | ".join(map(str, r)) + " |"
 
     md = ["# Benchmark results", "",
-          f"{len(rows)} valid runs ({invalid} discarded: machine slept > {SLEEP_GAP_LIMIT_S}s mid-run, rerun). Ground truth = `chaos.TRUTH`. MTTR averages resolved runs only. "
-          "cold = no runbooks, warm = seed runbooks (none for scenario 5).", "",
-          "## By mode × condition", "",
-          "| mode | condition | runs | diag accuracy | recovered | MTTR s | escalations | cost/run $ | total $ |",
-          "|---|---|---|---|---|---|---|---|---|",
-          *["| " + " | ".join(map(str, r)) + " |" for r in rollup], "",
-          "## By scenario", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols),
-          *["| " + " | ".join(map(str, r)) + " |" for r in table], "",
-          "## Where small-only fails", ""]
+          f"{len(rows)} valid runs ({invalid} discarded: machine slept > {SLEEP_GAP_LIMIT_S}s mid-run, rerun). "
+          "Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). MTTR averages resolved runs "
+          f"only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy {STILL_OK_AFTER_S}s "
+          "later. **unnecessary** = an action on a service that is not a true root, or a repeated action. "
+          "cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).", "",
+          "## Fault scenarios 1–6, by mode × condition", "",
+          line(["mode", "condition", *head]), "|" + "---|" * (len(head) + 2), *map(line, rollup), "",
+          "## Scenario 0: no-fault control", "",
+          "| mode | runs | false detections | actions taken |", "|---|---|---|---|", *map(line, ctrl), "",
+          "## By scenario", "", line(cols), "|" + "---|" * len(cols), *map(line, table), "",
+          "## Where small-only fails (not correct & recovered)", ""]
     if fails:
-        md += ["| run | resolved | diagnosed | truth | error |", "|---|---|---|---|---|"]
-        md += [f"| {r['key']} | {r['resolved']} | {r['diagnosed']} | "
-               f"{';'.join(f'{t}@{s}' for t, s in sorted(chaos.TRUTH[r['scenario']]))} | {r['error']} |" for r in fails]
+        md += ["| run | diagnosed | truth | resolved | actions | error |", "|---|---|---|---|---|---|"]
+        md += [f"| {r['key']} | {r['diagnosed']} | {';'.join(f'{t}@{s}' for t, s in sorted(chaos.TRUTH[r['scenario']]))} "
+               f"| {r['resolved']} | {r['actions_taken']} | {r['error']} |" for r in fails]
     else:
-        md.append("No small-only failures.")
+        md.append("None.")
+    md += ["", f"## Invariant violations: {len(viol)}", *[f"- {r['key']}: {r['invariant_violations']}" for r in viol],
+           "", f"## Errors: {len(errs)}", *[f"- {r['key']}: {r['error']}" for r in errs]]
     (OUT / "results.md").write_text("\n".join(md) + "\n")
     with (OUT / "summary.csv").open("w", newline="") as f:
         w = csv.writer(f)
@@ -156,7 +191,7 @@ def report():
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=3)
-    ap.add_argument("--scenarios", default="1,2,3,4,5")
+    ap.add_argument("--scenarios", default="0,1,2,3,4,5,6")
     ap.add_argument("--modes", default="hybrid,big-only,small-only")
     ap.add_argument("--conditions", default="cold,warm")
     ap.add_argument("--report-only", action="store_true")
