@@ -41,6 +41,8 @@ inject → detect (rules, polled; 3s alert-grouping window) → compress (drain3
   - Each step's cost equals price × tokens, and the incident cost equals the sum of its steps.
 - **Telemetry**: `steps` and `incidents` tables. The MTTD/MTTR clock starts *before* injection.
 
+**Dashboard** (`dashboard/`): runs the same `agent.run.run()` on one worker thread. It has exactly two hooks into the agent: `telemetry.LISTENERS` (live step feed) and `stages.approver` (approval provider, default `cli_approver` y/n; the dashboard swaps in a web Approve/Deny that denies after 10 min). It sees the live `Incident` through a subclass, without changing run(). Live runs are recorded to `.state/dashboard/<incident>.jsonl` for real-speed replay; CLI/benchmark incidents replay as timeline only. The page is a fixed 1920×1080 stage scaled to the window. Hiding a seed moves it to `.state/hidden_runbooks/`.
+
 The agent never touches Docker directly. It goes through `adapters/base.py` (`Observability`, `Actions`).
 
 ## Layout
@@ -56,7 +58,8 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
 | `agent/stages.py` | stages + `ask_json`, `flags`, `fault_checks`, `roots_consistent`, `risk_of` |
 | `agent/run.py` | CLI runner |
 | `agent/invariants.py` | post-incident invariant checks |
-| `agent/runbooks.py` | `list` / `approve` CLI for learned runbooks |
+| `agent/runbooks.py` | `list` / `approve` / `hide` / `restore` / `delete` for runbooks (CLI + used by the dashboard) |
+| `dashboard/app.py`, `dashboard/index.html` | live demo dashboard (FastAPI + SSE, one static page), replay, web approval |
 | `chaos.py` | scenarios 0–6 + `reset`; `TRUTH`, `EXPECTED_ACTIONS`, `diag_correct` |
 | `benchmarks/run.py` | benchmark (resumable, sleep guard) → `benchmarks/results.{csv,md}`; v1 in `benchmarks/v1/` |
 | `tests/failsafe.py` | break-the-agent cases (Ollama down, Claude down, bad JSON, no topology, action throws) |
@@ -110,6 +113,7 @@ uv run python -m agent.run --scenario 5 --auto-approve
 uv run python -m agent.runbooks list | approve <name>
 caffeinate -dimsu uv run python -u -m benchmarks.run > benchmarks/run.log 2>&1
 uv run python -m tests.failsafe
+uv run python -m dashboard.app                               # → http://localhost:8080
 ```
 
 ## Progress
@@ -117,4 +121,4 @@ uv run python -m tests.failsafe
 - [x] v1 benchmark (pre-audit) archived in `benchmarks/v1/`
 - [x] Overnight hardening: strict verify, hint removal, held-out scenario 6, control scenario 0, new metrics, safety (per-service risk, rolling restart, auto-undo, caps, runbook review), fresh-review audit fixes, fail-safe tests 5/5, invariants
 - [x] v2 benchmark (126 runs, post-audit) → `benchmarks/results.md`: hybrid 100% correct & recovered, 0 invariant violations, 0 false detections on the control
-- [ ] Dashboard
+- [x] Dashboard: live topology/timeline/counters, web approval, runbook review + learning demo (hide/restore seed), replay, benchmark tab. Tested from the page: s1 ($0, fast path), s5 with web approval, learning demo ($0.0146 → $0).

@@ -466,6 +466,13 @@ def risk_of(action: str, svc: str, obs) -> str:
     return risk
 
 
+def cli_approver(action: str, svc: str, reason: str) -> bool:
+    return Confirm.ask(f"[yellow]Approve HIGH-risk action[/] {action}({svc})? reason: {reason}", console=telemetry.console)
+
+
+approver = cli_approver  # approval provider: (action, service, reason) -> bool; the dashboard swaps in a web one
+
+
 def act(inc: Incident, obs):
     done = []
     for step in inc.plan:
@@ -483,8 +490,7 @@ def act(inc: Incident, obs):
                 telemetry.log_step(inc.id, "approve", tier="human", note=f"{a}({svc}) risk=high → auto-approved (--auto-approve)")
             else:
                 t = time.perf_counter()
-                yes = Confirm.ask(f"[yellow]Approve HIGH-risk action[/] {a}({svc})? reason: {step.get('reason', '')}",
-                                  console=telemetry.console)
+                yes = approver(a, svc, step.get("reason", ""))
                 telemetry.log_step(inc.id, "approve", tier="human", latency_s=time.perf_counter() - t,
                                    note=f"{a}({svc}) → {'approved' if yes else '[red]denied[/]'}")
                 if not yes:

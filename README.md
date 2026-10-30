@@ -38,6 +38,16 @@ uv run python -m agent.runbooks approve cache_down+db_pool_exhaustion.learned
 ```
 Incident reports land in `reports/`.
 
+## Dashboard (live demo)
+```bash
+uv run python -m dashboard.app      # then open http://localhost:8080
+```
+- **Live**: pick a fault (0–6) and a mode, then **Inject & run**. The topology turns red at the root cause and amber at symptoms. The timeline shows each stage with a RULES / SMALL / BIG / HUMAN badge, plus latency and cost. Counters show MTTD/MTTR, tokens, cost, escalations and the small vs big split.
+- **Human approval**: high-risk actions wait for Approve/Deny in the page. The CLI keeps its y/n prompt.
+- **Runbooks**: approve pending learned runbooks, delete learned ones, and hide or restore a seed for the learning demo (`python -m agent.runbooks hide|restore|delete` does the same from the CLI).
+- **Replay**: replays any past incident at real speed. Runs started from the dashboard (●) replay with topology; CLI and benchmark runs (○) replay the timeline only.
+- **Benchmark**: the v2 table, v1 → v2, scenario 0 and scenario 6, read from `benchmarks/`.
+
 ## Benchmark
 ```bash
 caffeinate -dimsu uv run python -u -m benchmarks.run > benchmarks/run.log 2>&1   # 7 scenarios × 3 modes × cold/warm × 3

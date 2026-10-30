@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I'adah · Recovery Control Room</title>
+<style>
+:root {
+  --bg: #070a0f; --panel: #0e131b; --panel2: #121925; --line: #1d2633; --text: #e6edf3; --muted: #7d8a99;
+  --ok: #22c55e; --fault: #ef4444; --amber: #f59e0b; --small: #2dd4bf; --big: #a78bfa; --rules: #64748b; --human: #facc15;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "Geeza Pro", Inter, sans-serif; }
+html { overflow: hidden; }
+body { display: grid; grid-template-rows: auto 1fr; width: 1920px; height: 1080px; overflow: hidden; transform-origin: 0 0; }
+button, select { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 16px; cursor: pointer; }
+button:disabled { opacity: .35; cursor: default; }
+button:hover:not(:disabled) { border-color: #2f3d51; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+
+/* header */
+header { display: flex; align-items: center; gap: 28px; padding: 14px 28px; border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #0c121b, var(--bg)); }
+.brand h1 { margin: 0; font-size: 34px; font-weight: 700; letter-spacing: .3px; }
+.brand h1 .ar { font-size: 38px; }
+.brand h1 .sep { color: var(--muted); font-weight: 300; margin: 0 10px; }
+.brand p { margin: 0; color: var(--muted); font-size: 16px; letter-spacing: 1.5px; text-transform: uppercase; }
+.tabs { margin-left: auto; display: flex; gap: 6px; background: var(--panel); padding: 5px; border-radius: 12px; border: 1px solid var(--line); }
+.tabs button { border: 0; background: transparent; padding: 8px 20px; color: var(--muted); font-weight: 600; letter-spacing: 1px; }
+.tabs button.on { background: var(--panel2); color: var(--text); }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 7px 14px; border-radius: 999px; font-weight: 700;
+  letter-spacing: 1px; font-size: 15px; border: 1px solid var(--line); background: var(--panel); white-space: nowrap; }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+.chip.running .dot { background: var(--fault); animation: blink 1s infinite; }
+.chip.ok .dot { background: var(--ok); } .chip.human .dot { background: var(--amber); }
+.chip.replay .dot { background: var(--big); animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+
+/* live layout */
+#live { display: grid; grid-template-columns: 520px minmax(0, 1fr) 440px; grid-template-rows: 1fr auto; gap: 16px; padding: 16px 20px 18px; min-height: 0; }
+#bench { display: none; padding: 20px 28px; overflow: auto; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; min-height: 0; }
+.card h2 { white-space: nowrap; margin: 0 0 12px; font-size: 14px; letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted); font-weight: 700;
+  display: flex; align-items: center; gap: 10px; }
+.card h2 .r { margin-left: auto; letter-spacing: 0; text-transform: none; font-weight: 500; }
+
+/* topology */
+#topoCard { display: flex; flex-direction: column; }
+#topo { flex: 1; width: 100%; min-height: 0; }
+.edge { stroke: #2a3546; stroke-width: 2.5; fill: none; transition: stroke .6s; }
+.edge.hot { stroke: var(--fault); stroke-dasharray: 8 7; animation: flow .7s linear infinite; }
+@keyframes flow { to { stroke-dashoffset: -15; } }
+.node circle { stroke-width: 3; transition: fill .6s, stroke .6s; }
+.node .name { font-size: 21px; font-weight: 700; fill: var(--text); text-anchor: middle; }
+.node .sub { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; text-anchor: middle; transition: fill .6s; }
+.node .typ { font: 600 14px var(--mono); text-anchor: middle; fill: var(--fault); }
+.node .ring { fill: none; stroke-width: 2; opacity: 0; }
+.s-healthy circle.body { fill: rgba(34,197,94,.12); stroke: var(--ok); } .s-healthy .sub { fill: var(--ok); }
+.s-root circle.body { fill: rgba(239,68,68,.22); stroke: var(--fault); } .s-root .sub { fill: var(--fault); }
+.s-root .ring { stroke: var(--fault); animation: ping 1.4s ease-out infinite; }
+.s-fault circle.body { fill: rgba(239,68,68,.14); stroke: var(--fault); } .s-fault .sub { fill: var(--fault); }
+.s-symptom circle.body { fill: rgba(245,158,11,.16); stroke: var(--amber); } .s-symptom .sub { fill: var(--amber); }
+.s-preparing circle.body, .s-unknown circle.body { fill: rgba(100,116,139,.12); stroke: var(--rules); }
+.s-preparing .sub, .s-unknown .sub { fill: var(--muted); }
+@keyframes ping { 0% { opacity: .8; r: 46; } 100% { opacity: 0; r: 74; } }
+.legend { display: flex; gap: 18px; color: var(--muted); font-size: 14px; flex-wrap: wrap; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+
+/* timeline */
+#tlCard { display: flex; flex-direction: column; }
+#tl { flex: 1; overflow-y: auto; min-height: 0; padding-right: 6px; }
+.row { display: grid; grid-template-columns: 74px 86px 104px 1fr; gap: 12px; align-items: start; padding: 10px 8px;
+  border-bottom: 1px solid #161e2a; animation: slide .35s ease-out; }
+@keyframes slide { from { opacity: 0; transform: translateY(8px); } }
+.row .t { font: 600 15px var(--mono); color: var(--muted); padding-top: 3px; }
+.row .stage { font-weight: 700; padding-top: 2px; }
+.row .note { color: #cfd8e3; word-break: break-word; }
+.row .meta { margin-top: 3px; font: 13.5px var(--mono); color: var(--muted); }
+.row .meta b { color: var(--text); font-weight: 600; }
+.badge { display: inline-block; text-align: center; width: 78px; padding: 4px 0; border-radius: 7px; font: 800 13px var(--mono); letter-spacing: 1.5px; }
+.b-rules { background: #263041; color: #cbd5e1; } .b-small { background: var(--small); color: #04211d; }
+.b-big { background: var(--big); color: #160b33; } .b-human { background: var(--human); color: #231c00; }
+.row.big { background: linear-gradient(90deg, rgba(167,139,250,.09), transparent 60%); }
+.row.human { background: linear-gradient(90deg, rgba(250,204,21,.08), transparent 60%); }
+.row.good .note { color: var(--ok); } .row.bad .note { color: #fca5a5; }
+.empty { color: var(--muted); text-align: center; margin-top: 18%; font-size: 19px; }
+
+/* counters */
+#right { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+#banner { border-radius: 12px; padding: 12px 14px; font-weight: 800; letter-spacing: 1px; text-align: center; font-size: 18px;
+  background: var(--panel2); color: var(--muted); margin-bottom: 12px; transition: background .5s, color .5s; }
+#banner.ok { background: rgba(34,197,94,.16); color: var(--ok); } #banner.bad { background: rgba(239,68,68,.16); color: var(--fault); }
+#banner.human { background: rgba(245,158,11,.16); color: var(--amber); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.k { background: var(--panel2); border-radius: 12px; padding: 8px 14px; }
+.k .l { font-size: 12.5px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+.k .v { font: 700 26px var(--mono); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.k.wide { grid-column: span 2; } .k.wide .v { font-size: 46px; line-height: 1.05; }
+.split { height: 12px; border-radius: 6px; background: #1b2431; overflow: hidden; display: flex; margin-top: 10px; }
+.split div { transition: width .5s; } .split .s { background: var(--small); } .split .b { background: var(--big); }
+.splitl { display: flex; justify-content: space-between; margin-top: 8px; font-size: 15px; font-weight: 600; }
+
+/* runbooks */
+#rbCard { overflow-y: auto; max-height: 230px; }
+#outCard { flex: 1; overflow-y: auto; }
+.rb { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 9px 0; border-bottom: 1px solid #161e2a; align-items: center; }
+.rb .f { font: 600 15px var(--mono); }
+.rb .a { font: 13px var(--mono); color: var(--muted); grid-column: 1; }
+.rb .btns { grid-row: span 2; display: flex; gap: 6px; }
+.rb .btns button { padding: 6px 10px; font-size: 13.5px; }
+.st { font: 700 11.5px var(--mono); letter-spacing: 1px; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
+.st-approved { background: rgba(34,197,94,.15); color: var(--ok); } .st-pending_review { background: rgba(245,158,11,.18); color: var(--amber); }
+.st-hidden { background: #263041; color: var(--muted); }
+
+/* bottom */
+#bottom { grid-column: 1 / -1; display: grid; grid-template-columns: 1.25fr 1fr 1.25fr; gap: 16px; }
+.ctl { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.ctl label { font-size: 13px; letter-spacing: 2px; color: var(--muted); font-weight: 700; text-transform: uppercase; }
+#scenario { min-width: 330px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 10px 14px; background: var(--panel2); color: var(--muted); font-weight: 600; }
+.seg button.on { background: #233046; color: var(--text); }
+#runBtn { background: var(--fault); border-color: var(--fault); color: white; font-weight: 800; letter-spacing: 1px; padding: 10px 22px; }
+#approval { transition: border-color .4s, box-shadow .4s; }
+#approval.pending { border-color: var(--human); box-shadow: 0 0 0 1px var(--human), 0 0 32px rgba(250,204,21,.25); animation: glow 1.6s infinite; }
+@keyframes glow { 50% { box-shadow: 0 0 0 1px var(--human), 0 0 10px rgba(250,204,21,.1); } }
+#apAct { font: 700 22px var(--mono); color: var(--human); }
+#apWhy { color: #cfd8e3; margin: 4px 0 10px; font-size: 15px; max-height: 44px; overflow: hidden; }
+#approve { background: var(--ok); border-color: var(--ok); color: #03200d; font-weight: 800; padding: 10px 26px; }
+#deny { background: transparent; border-color: var(--fault); color: var(--fault); font-weight: 800; padding: 10px 26px; }
+#toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #3b1111; border: 1px solid var(--fault);
+  padding: 10px 18px; border-radius: 10px; display: none; z-index: 9; }
+
+/* benchmark */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }
+.kpis .k .v { font-size: 40px; }
+.bgrid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 16px; }
+th { text-align: right; font-size: 12.5px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); }
+td { text-align: right; padding: 6px 10px; border-bottom: 1px solid #161e2a; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+tr.hy td { background: rgba(45,212,191,.06); }
+.m-hybrid { color: var(--small); font-weight: 700; } .m-big-only { color: var(--big); font-weight: 700; } .m-small-only { color: #94a3b8; font-weight: 700; }
+.note2 { color: var(--muted); font-size: 14.5px; margin-top: 10px; line-height: 1.5; }
+.down { color: #fca5a5; } .up { color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <h1><span class="ar" dir="rtl" lang="ar">إعادة</span><span class="sep">|</span>I'adah</h1>
+    <p>Agentic Recovery, Efficient by Design</p>
+  </div>
+  <div class="tabs"><button id="tabLive" class="on">LIVE</button><button id="tabBench">BENCHMARK</button></div>
+  <span id="activity" class="chip"><span class="dot"></span><span id="actText">IDLE</span></span>
+</header>
+
+<main id="live">
+  <section class="card" id="topoCard">
+    <h2>Service topology <span class="r muted" id="scLabel"></span></h2>
+    <svg id="topo" viewBox="0 0 480 540" preserveAspectRatio="xMidYMid meet">
+      <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#3a4a60"/></marker>
+        <marker id="arrHot" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"/></marker></defs>
+      <g id="edges"></g><g id="nodes"></g>
+    </svg>
+    <div class="legend"><span><i style="background:var(--ok)"></i>healthy</span><span><i style="background:var(--fault)"></i>root cause</span>
+      <span><i style="background:var(--amber)"></i>symptom</span><span class="muted">arrow = depends on</span></div>
+  </section>
+
+  <section class="card" id="tlCard">
+    <h2>Agent timeline <span class="r muted" style="font-size:14px"><span style="color:#cbd5e1">RULES</span> code · <span style="color:var(--small)">SMALL</span> qwen3.5:4b local · <span style="color:var(--big)">BIG</span> Claude Sonnet · <span style="color:var(--human)">HUMAN</span> approval</span></h2>
+    <div id="tl"><div class="empty">Pick a fault and press <b>Inject &amp; run</b>.</div></div>
+  </section>
+
+  <section id="right">
+    <div class="card">
+      <div id="banner">READY</div>
+      <div class="grid2">
+        <div class="k wide"><div class="l">Elapsed since fault</div><div class="v" id="cElapsed">0.0s</div></div>
+        <div class="k"><div class="l">MTTD</div><div class="v" id="cMttd">—</div></div>
+        <div class="k"><div class="l">MTTR</div><div class="v" id="cMttr">—</div></div>
+        <div class="k"><div class="l">LLM tokens</div><div class="v" id="cTok">0</div></div>
+        <div class="k"><div class="l">Total cost</div><div class="v" id="cCost">$0.0000</div></div>
+        <div class="k"><div class="l">Escalations</div><div class="v" id="cEsc">0</div></div>
+        <div class="k"><div class="l">Log tokens</div><div class="v" id="cLog" style="font-size:22px;padding-top:6px">—</div></div>
+        <div class="k wide" style="padding-bottom:12px"><div class="l">Model calls · small vs big</div>
+          <div class="split"><div class="s" id="splS" style="width:0"></div><div class="b" id="splB" style="width:0"></div></div>
+          <div class="splitl"><span style="color:var(--small)" id="cSmall">SMALL 0 · $0</span><span style="color:var(--big)" id="cBig">BIG 0 · $0</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="card" id="outCard">
+      <h2>Outcome</h2>
+      <div id="outcome" class="muted" style="font-size:16px">—</div>
+    </div>
+  </section>
+
+  <section id="bottom">
+    <div class="card">
+      <h2>Inject fault</h2>
+      <div class="ctl">
+        <select id="scenario"></select>
+        <div class="seg" id="modes"></div>
+        <button id="runBtn">INJECT &amp; RUN</button>
+      </div>
+      <div class="ctl" style="margin-top:12px">
+        <label>Replay</label>
+        <select id="incidents" style="flex:1;min-width:0"></select>
+        <button id="replayBtn">Replay</button><button id="stopBtn">Stop</button>
+      </div>
+    </div>
+    <div class="card" id="approval">
+      <h2>Human approval</h2>
+      <div id="apIdle" class="muted">Low-risk actions run on their own. High-risk actions (config rollback, killing DB sessions,
+        deleting scratch files, restarting a stateful service) wait here.</div>
+      <div id="apPend" style="display:none">
+        <div id="apAct"></div><div id="apWhy"></div>
+        <div class="ctl"><button id="approve">APPROVE</button><button id="deny">DENY</button></div>
+      </div>
+    </div>
+    <div class="card" id="rbCard">
+      <h2>Runbooks <span class="r"><button id="restoreBtn" style="padding:5px 10px;font-size:13px">Restore hidden seeds</button></span></h2>
+      <div id="rbs"></div>
+    </div>
+  </section>
+</main>
+
+<main id="bench"></main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const POS = { traffic: [240, 58], api: [130, 215], worker: [350, 215], db: [130, 425], cache: [350, 425] };
+const SUB = { healthy: "HEALTHY", root: "ROOT CAUSE", symptom: "SYMPTOM", fault: "FAULT", preparing: "BASELINE", unknown: "—" };
+let mode = "hybrid", cur = { activity: "idle" }, acc, tick = null, lastAct = null;
+
+const fmt$ = x => "$" + (x || 0).toFixed(4);
+const fmtS = x => x == null ? "—" : x.toFixed(1) + "s";
+const esc = s => String(s ?? "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; setTimeout(() => t.style.display = "none", 4000); }
+async function post(url) { const r = await fetch(url, { method: "POST" }); if (!r.ok) toast((await r.json()).detail || r.statusText); return r.ok; }
+
+/* ---------- topology ---------- */
+function drawTopo(topo, nodes) {
+  const names = Object.keys(topo).length ? Object.keys(topo) : Object.keys(POS);
+  let extra = 0;
+  names.forEach(n => { if (!POS[n]) POS[n] = [60 + 120 * extra++, 515]; });
+  const st = n => (nodes[n] || {}).state || "unknown";
+  let e = "";
+  for (const [src, deps] of Object.entries(topo)) for (const d of deps) {
+    const [x1, y1] = POS[src], [x2, y2] = POS[d], L = Math.hypot(x2 - x1, y2 - y1);
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L, hot = ["root", "fault"].includes(st(d)) && st(src) !== "healthy";
+    e += `<line class="edge ${hot ? "hot" : ""}" x1="${x1 + ux * 50}" y1="${y1 + uy * 50}" x2="${x2 - ux * 54}" y2="${y2 - uy * 54}"
+      marker-end="url(#${hot ? "arrHot" : "arr"})"/>`;
+  }
+  $("edges").innerHTML = e;
+  const g = $("nodes");
+  for (const n of names) {
+    let el = g.querySelector(`[data-n="${n}"]`);
+    const [x, y] = POS[n];
+    if (!el) {
+      el = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      el.dataset.n = n;
+      el.innerHTML = `<circle class="ring" cx="${x}" cy="${y}" r="46"/><circle class="body" cx="${x}" cy="${y}" r="46"/>
+        <text class="name" x="${x}" y="${y + 7}">${n}</text><text class="sub" x="${x}" y="${y + 70}"></text>
+        <text class="typ" x="${x}" y="${y + 90}"></text>`;
+      g.appendChild(el);
+    }
+    const s = st(n), info = nodes[n] || {};
+    el.setAttribute("class", "node s-" + s);
+    el.querySelector(".sub").textContent = SUB[s] || s;
+    el.querySelector(".typ").textContent = s === "root" ? (info.type || "") : "";
+    el.querySelector(".typ").style.fill = s === "root" ? "" : "var(--muted)";
+  }
+}
+
+/* ---------- timeline + counters ---------- */
+function resetView(ev) {
+  acc = { tok: 0, cost: 0, small: 0, big: 0, sCost: 0, bCost: 0 };
+  $("tl").innerHTML = "";
+  ["cMttd", "cMttr"].forEach(i => $(i).textContent = "—");
+  $("cElapsed").textContent = "0.0s"; $("cEsc").textContent = "0"; $("cLog").textContent = "—";
+  $("outcome").textContent = "—";
+  counters();
+  if (ev.kind === "live") { $("scLabel").textContent = `scenario ${ev.scenario} · ${ev.mode}`; banner("PREPARING · reset + baseline", ""); }
+  if (ev.kind === "replay") { $("scLabel").textContent = `replay ${ev.incident}${ev.recorded ? "" : " (timeline only)"}`; banner("REPLAY", ""); }
+}
+function counters() {
+  $("cTok").textContent = acc.tok.toLocaleString();
+  $("cCost").textContent = fmt$(acc.cost);
+  const n = acc.small + acc.big || 1;
+  $("splS").style.width = (100 * acc.small / n) + "%"; $("splB").style.width = (100 * acc.big / n) + "%";
+  $("cSmall").textContent = `SMALL ${acc.small} · ${fmt$(acc.sCost)}`; $("cBig").textContent = `BIG ${acc.big} · ${fmt$(acc.bCost)}`;
+}
+function step(ev) {
+  const tl = $("tl");
+  if (tl.querySelector(".empty")) tl.innerHTML = "";
+  const llm = !!ev.model, bad = /not recovered|failed|denied|stop|violation|worse/i.test(ev.note);
+  const good = !bad && (/^recovered/.test(ev.note) || /→ approved|healthy, nothing to do/.test(ev.note));
+  const r = document.createElement("div");
+  r.className = `row ${ev.tier} ${bad ? "bad" : good ? "good" : ""}`;
+  const meta = llm ? `<div class="meta"><b>${esc(ev.model)}</b>${ev.fallback ? " (fallback)" : ""} · ${ev.tin}→${ev.tout} tok · ${ev.lat.toFixed(2)}s · <b>${fmt$(ev.cost)}</b></div>`
+    : ev.lat > 0.05 ? `<div class="meta">${ev.lat.toFixed(2)}s</div>` : "";
+  r.innerHTML = `<div class="t">+${ev.t.toFixed(1)}s</div><div><span class="badge b-${ev.tier}">${ev.tier.toUpperCase()}</span></div>
+    <div class="stage">${esc(ev.stage)}</div><div><div class="note">${esc(ev.note)}</div>${meta}</div>`;
+  tl.appendChild(r);
+  requestAnimationFrame(() => tl.scrollTop = tl.scrollHeight);
+  if (llm) {
+    acc.tok += ev.tin + ev.tout; acc.cost += ev.cost;
+    if (ev.tier === "big") { acc.big++; acc.bCost += ev.cost; } else { acc.small++; acc.sCost += ev.cost; }
+    counters();
+  }
+}
+function banner(text, cls) { const b = $("banner"); b.textContent = text; b.className = cls; }
+
+function state(ev) {
+  cur = ev;
+  const act = ev.activity, inc = ev.inc;
+  if (Object.keys(ev.nodes || {}).length) drawTopo(ev.topology, ev.nodes);
+  else if (act === "replay") drawTopo({}, {});
+  const busy = act === "running" || act === "replay";
+  $("runBtn").disabled = $("replayBtn").disabled = busy; $("stopBtn").disabled = act !== "replay";
+  document.querySelectorAll(".rb button, #restoreBtn").forEach(b => b.disabled = busy || b.dataset.off === "1");
+  const chip = $("activity");
+  const label = { idle: "IDLE", running: "LIVE", done: "DONE", replay: "REPLAY" }[act] || act;
+  chip.className = "chip " + (act === "running" ? "running" : act === "replay" ? "replay" : inc && inc.resolved ? "ok" : inc && inc.needs_human ? "human" : "");
+  $("actText").textContent = label;
+  if (ev.error) toast(ev.error);
+  if (inc) {
+    $("cMttd").textContent = fmtS(inc.mttd); $("cMttr").textContent = fmtS(inc.mttr);
+    $("cEsc").textContent = inc.escalations;
+    if (inc.log_raw) $("cLog").textContent = `${inc.log_raw.toLocaleString()} → ${inc.log_comp.toLocaleString()}`;
+    const ticking = (act === "running" || act === "replay") && inc.injected && inc.mttr == null && !inc.needs_human;
+    tick = ticking ? { base: inc.elapsed, at: performance.now() } : null;
+    if (!ticking) $("cElapsed").textContent = fmtS(inc.injected ? inc.elapsed : 0);
+    if (inc.resolved) { banner(`RECOVERED IN ${fmtS(inc.mttr)} · ${fmt$(acc.cost)}`, "ok"); }
+    else if (inc.needs_human) banner("HANDED TO HUMAN", "human");
+    else if (act === "done") banner(inc.mttd == null ? "NO FAULT DETECTED · NOTHING TOUCHED" : "NOT RESOLVED", inc.mttd == null ? "ok" : "bad");
+    else if (inc.injected && inc.mttd == null) banner("FAULT INJECTED · WATCHING", "bad");
+    else if (inc.mttd != null) banner(`INCIDENT · ITERATION ${inc.iteration || 1}`, "bad");
+    if (act === "done" || (act === "replay" && (inc.resolved || inc.needs_human))) {
+      const roots = (inc.roots || []).map(r => `${r.incident_type}@${r.service}`).join(", ");
+      $("outcome").innerHTML = `${roots ? `Root cause: <b class="mono">${esc(roots)}</b><br>` : ""}` +
+        `${inc.fast_path ? "Fast path (approved runbook, no big model). " : ""}${inc.plan_source ? `Plan from <b class="mono">${esc(inc.plan_source)}</b>. ` : ""}` +
+        `${inc.runbook_saved ? `<br>Runbook: <b class="mono">${esc(inc.runbook_saved)}</b>` : ""}${inc.needs_human ? `<br>Human needed: ${esc(inc.needs_human)}` : ""}`;
+    }
+  }
+  const ap = ev.approval;
+  $("approval").classList.toggle("pending", !!ap);
+  $("apIdle").style.display = ap ? "none" : ""; $("apPend").style.display = ap ? "" : "none";
+  if (ap) {
+    $("apAct").textContent = `HIGH-RISK · ${ap.action}(${ap.service})`; $("apWhy").textContent = ap.reason || "";
+    $("approve").disabled = $("deny").disabled = act === "replay";
+  }
+  if (act !== lastAct) { if (["done", "idle"].includes(act)) { loadRunbooks(); loadIncidents(); } lastAct = act; }
+}
+setInterval(() => { if (tick) $("cElapsed").textContent = fmtS(tick.base + (performance.now() - tick.at) / 1000); }, 100);
+
+/* ---------- runbooks, incidents, controls ---------- */
+async function loadRunbooks() {
+  const rbs = await (await fetch("/api/runbooks")).json();
+  $("rbs").innerHTML = rbs.map(r => {
+    const learned = r.file.endsWith(".learned.yaml");
+    const b = [r.status === "pending_review" ? `<button data-op="approve" data-f="${r.file}">Approve</button>` : "",
+      r.seed && !r.hidden ? `<button data-op="hide" data-f="${r.file}">Hide</button>` : "",
+      learned ? `<button data-op="delete" data-f="${r.file}">Delete</button>` : ""].join("");
+    return `<div class="rb"><div class="f">${esc(r.file.replace(".yaml", ""))}<span class="st st-${r.status}">${r.status.replace("_", " ").toUpperCase()}</span></div>
+      <div class="btns">${b}</div><div class="a">${r.hidden ? "hidden for the learning demo" : esc(r.actions.join(", "))}${r.times_used ? ` · used ${r.times_used}×` : ""}</div></div>`;
+  }).join("") || `<div class="muted">no runbooks</div>`;
+  $("restoreBtn").dataset.off = rbs.some(r => r.hidden) ? "0" : "1";
+  $("restoreBtn").disabled = $("restoreBtn").dataset.off === "1" || ["running", "replay"].includes(cur.activity);
+  $("rbs").querySelectorAll("button").forEach(b => {
+    b.disabled = ["running", "replay"].includes(cur.activity);
+    b.onclick = async () => { await post(`/api/runbooks/${b.dataset.op}?name=${encodeURIComponent(b.dataset.f)}`); loadRunbooks(); };
+  });
+}
+async function loadIncidents() {
+  const incs = await (await fetch("/api/incidents")).json();
+  $("incidents").innerHTML = incs.map(i => `<option value="${i.id}">${i.recorded ? "● " : "○ "}${i.id} · s${i.scenario} · ${i.mode} · ` +
+    `${i.resolved ? "MTTR " + (i.mttr || 0).toFixed(0) + "s" : "unresolved"} · $${(i.cost || 0).toFixed(4)}</option>`).join("");
+}
+async function init() {
+  const m = await (await fetch("/api/meta")).json();
+  $("scenario").innerHTML = Object.entries(m.scenarios).map(([k, d]) => `<option value="${k}" ${k === "1" ? "selected" : ""}>${k} · ${esc(d)}</option>`).join("");
+  $("modes").innerHTML = m.modes.map(x => `<button data-m="${x}" class="${x === mode ? "on" : ""}">${x}</button>`).join("");
+  $("modes").querySelectorAll("button").forEach(b => b.onclick = () => {
+    mode = b.dataset.m; $("modes").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  });
+  $("runBtn").onclick = () => fetch("/api/run", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenario: $("scenario").value, mode }) }).then(async r => { if (!r.ok) toast((await r.json()).detail); });
+  $("replayBtn").onclick = () => $("incidents").value && post(`/api/replay/${$("incidents").value}`);
+  $("stopBtn").onclick = () => post("/api/replay-stop");
+  $("approve").onclick = () => post("/api/approval/approve");
+  $("deny").onclick = () => post("/api/approval/deny");
+  $("restoreBtn").onclick = async () => { await post("/api/runbooks/restore"); loadRunbooks(); };
+  $("tabLive").onclick = () => tab(true); $("tabBench").onclick = () => tab(false);
+  acc = { tok: 0, cost: 0, small: 0, big: 0, sCost: 0, bCost: 0 };
+  loadRunbooks(); loadIncidents();
+  const es = new EventSource("/api/events");
+  es.onmessage = m => { const ev = JSON.parse(m.data); ({ reset: resetView, step, state })[ev.type]?.(ev); };
+}
+function tab(live) {
+  $("tabLive").classList.toggle("on", live); $("tabBench").classList.toggle("on", !live);
+  $("live").style.display = live ? "" : "none"; $("bench").style.display = live ? "none" : "block";
+  if (!live && !$("bench").innerHTML) loadBench();
+}
+
+/* ---------- benchmark ---------- */
+async function loadBench() {
+  const b = await (await fetch("/api/benchmark")).json();
+  const by = (rs, m, c) => rs.find(r => r.mode === m && r.cond === c);
+  const save = c => Math.round(100 * (1 - by(b.v2, "hybrid", c).cost / by(b.v2, "big-only", c).cost));
+  const fd = b.control.reduce((s, r) => s + r.detections, 0), fr = b.control.reduce((s, r) => s + r.runs, 0);
+  const tr = (r, cells) => `<tr class="${r.mode === "hybrid" ? "hy" : ""}"><td class="m-${r.mode}">${r.mode}</td><td>${r.cond || ""}</td>${cells.map(c => `<td>${c ?? ""}</td>`).join("")}</tr>`;
+  const head = cols => `<tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr>`;
+  const main = (rs) => `<table>${head(["mode", "runbooks", "runs", "diagnosis", "recovered", "correct & recovered", "MTTR s", "unnecessary / inc", "escalations", "cost / run"])}
+    ${rs.map(r => tr(r, [r.runs, r.diag, r.recovered, `<b>${r.cr}</b>`, r.mttr, r.unnecessary, r.esc, fmt$(r.cost)])).join("")}</table>`;
+  $("bench").innerHTML = `
+  <div class="kpis">
+    <div class="k"><div class="l">Benchmark runs (v2)</div><div class="v">${b.totals.runs}</div></div>
+    <div class="k"><div class="l">Hybrid cost vs big-only</div><div class="v" style="color:var(--small)">−${save("cold")}% / −${save("warm")}%</div><div class="muted">cold / warm, same accuracy</div></div>
+    <div class="k"><div class="l">Invariant violations</div><div class="v" style="color:var(--ok)">${b.totals.violations}</div></div>
+    <div class="k"><div class="l">False alarms (no-fault control)</div><div class="v" style="color:var(--ok)">${fd} / ${fr}</div></div>
+  </div>
+  <div class="card" style="margin-bottom:16px"><h2>v2 results · fault scenarios 1–6 · n=3 per cell <span class="r muted">cold = no runbooks · warm = seed runbooks · total spend $${b.totals.spend}</span></h2>${main(b.v2)}</div>
+  <div class="bgrid">
+    <div class="card"><h2>v1 → v2 · scenarios 1–5 (like for like)</h2>
+      <table>${head(["mode", "runbooks", "v1 recovered", "v2 correct & rec.", "v1 MTTR", "v2 MTTR", "v1 $/run", "v2 $/run"])}
+      ${b.compare.map(r => tr(r, [r.v1.recovered + (r.mode === "small-only" ? "*" : ""), `<b>${r.v2.cr}</b>`, r.v1.mttr, r.v2.mttr, fmt$(r.v1.cost), fmt$(r.v2.cost)])).join("")}</table>
+      <div class="note2">v2 is stricter, not slower at fixing: verify now needs 3 healthy polls over ≥20s, and the clock starts <i>before</i> injection.
+        Hints were removed and diagnoses that contradict the topology are rejected instead of silently rewritten.
+        *v1's small-only “100%” were false recoveries (single-poll verify, accidental restarts).</div></div>
+    <div>
+      <div class="card" style="margin-bottom:16px"><h2>Scenario 0 · no-fault control</h2>
+        <table>${head(["mode", "", "runs", "false detections", "actions"])}${b.control.map(r => tr(r, [r.runs, r.detections, r.actions])).join("")}</table></div>
+      <div class="card"><h2>Scenario 6 · held out (no tuning)</h2>
+        <table>${head(["mode", "runbooks", "correct & rec.", "MTTR s", "unnecessary", "$/run"])}${b.s6.map(r => tr(r, [`<b>${r.cr}</b>`, r.mttr, r.unnecessary, fmt$(r.cost)])).join("")}</table>
+        <div class="note2">Wrong REDIS_HOST after a deploy. Warm hybrid first misfires (cache runbook restarts the api), verify catches it, escalates, Sonnet rolls back the config.</div></div>
+    </div>
+  </div>`;
+}
+// Designed as a 1920×1080 stage; scaled to fit any window so a recording looks the same everywhere.
+function fit() { const k = Math.min(innerWidth / 1920, innerHeight / 1080);
+  document.body.style.transform = `scale(${k})`; document.body.style.marginLeft = `${(innerWidth - 1920 * k) / 2}px`; }
+addEventListener("resize", fit); fit();
+init();
+</script>
+</body>
+</html>

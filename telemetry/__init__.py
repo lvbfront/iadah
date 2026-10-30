@@ -10,6 +10,7 @@ import config
 console = Console()
 _conn = None
 _t0: dict[str, float] = {}
+LISTENERS: list = []  # callables(row) — e.g. the dashboard's live feed
 
 BADGE = {"small": "[black on green] SMALL [/]", "big": "[white on magenta]  BIG  [/]",
          "rules": "[black on white] RULES [/]", "human": "[black on yellow] HUMAN [/]"}
@@ -51,6 +52,8 @@ def log_step(incident: str, stage: str, result=None, latency_s: float = 0.0, not
     with _db() as c:
         c.execute("INSERT INTO steps VALUES (?,?,?,?,?,?,?,?,?,?,?)", row)
     _print(row)
+    for f in LISTENERS:
+        f(row)
 
 
 def _print(row):
