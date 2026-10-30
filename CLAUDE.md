@@ -87,6 +87,7 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
 - **The fast-path misfire on scenario 6 is not fixed.** The small model triaged `cache_down@api`, and the cache runbook restarted the api (low risk, caught by verify, escalated, then fixed by rollback). Scoping runbooks per service would be a runbook change motivated by the held-out scenario. Documented as a known limitation instead.
 - **"Worse after an action"** = more services flagged by the loose detect rules ACTION_SETTLE_S (5s) after the service is back. Count-based, to avoid noise from error-rate windows.
 - **Expected actions** per scenario are strict. restart(db) for scenario 5 and restart(api) for scenario 4 count as unnecessary.
+- **Harness errors are rerun, agent failures are not.** In v2, 4 runs failed in 1s inside `chaos.reset()`: `compose up` waits for db to be healthy, and db was still exhausted after a small-only scenario 5 run. `reset` now retries for up to 60s. Only those 4 rows were deleted and rerun; every agent outcome stands as recorded.
 - **Primary diagnosis accuracy** grades the agent's final roots (model output minus topology symptoms). Model-raw accuracy is reported alongside.
 
 ## Known limitations
@@ -115,5 +116,5 @@ uv run python -m tests.failsafe
 - [x] Scenarios 0–6 end-to-end, hybrid / big-only / small-only, fast path, learning loop with human approval
 - [x] v1 benchmark (pre-audit) archived in `benchmarks/v1/`
 - [x] Overnight hardening: strict verify, hint removal, held-out scenario 6, control scenario 0, new metrics, safety (per-service risk, rolling restart, auto-undo, caps, runbook review), fresh-review audit fixes, fail-safe tests 5/5, invariants
-- [ ] v2 benchmark → `benchmarks/results.md`
+- [x] v2 benchmark (126 runs, post-audit) → `benchmarks/results.md`: hybrid 100% correct & recovered, 0 invariant violations, 0 false detections on the control
 - [ ] Dashboard

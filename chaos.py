@@ -81,7 +81,14 @@ def reset():
     subprocess.run(["docker", "rm", "-f", LEAK], capture_output=True)
     if PREV.exists():
         shutil.move(PREV, CFG)
-    compose("up", "-d", "--scale", "worker=1")
+    for attempt in range(6):  # compose up waits for db healthy; after a failed run db can need a while
+        try:
+            compose("up", "-d", "--scale", "worker=1")
+            break
+        except subprocess.CalledProcessError as e:
+            if attempt == 5:
+                raise RuntimeError(f"reset failed: {e.stderr.decode()[-300:]}") from e
+            time.sleep(10)
     compose("restart", "api", "worker")  # also clears the api tmpfs and the worker leak
 
 

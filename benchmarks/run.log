@@ -1,0 +1,324 @@
+126 runs to do (0 already done)
+[1/126] s0-hybrid-cold-1: resolved=1 diag=1 (none) mttr= $0 86s 
+[2/126] s0-hybrid-warm-1: resolved=1 diag=1 (none) mttr= $0 84s 
+[3/126] s0-big-only-cold-1: resolved=1 diag=1 (none) mttr= $0 85s 
+[4/126] s0-big-only-warm-1: resolved=1 diag=1 (none) mttr= $0 85s 
+[5/126] s0-small-only-cold-1: resolved=1 diag=1 (none) mttr= $0 85s 
+[6/126] s0-small-only-warm-1: resolved=1 diag=1 (none) mttr= $0 85s 
+[7/126] s1-hybrid-cold-1: resolved=1 diag=1 (cache_down@cache) mttr=56.3 $0.0154 90s 
+[8/126] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=44.9 $0.0 79s 
+[9/126] s1-big-only-cold-1: resolved=1 diag=1 (cache_down@cache) mttr=46.4 $0.02147 81s 
+[10/126] s1-big-only-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=40.9 $0.00749 76s 
+[11/126] s1-small-only-cold-1: resolved=1 diag=1 (cache_down@cache) mttr=57.8 $0.0 92s 
+[12/126] s1-small-only-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=44.1 $0.0 79s 
+[13/126] s2-hybrid-cold-1: resolved=1 diag=1 (db_auth_failure@api) mttr=69.1 $0.02169 104s 
+[14/126] s2-hybrid-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=59.8 $0.00782 94s 
+[15/126] s2-big-only-cold-1: resolved=1 diag=1 (db_auth_failure@api) mttr=57.9 $0.02135 92s 
+[16/126] s2-big-only-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=47.5 $0.0073 82s 
+[17/126] s2-small-only-cold-1: resolved=0 diag=0 (none) mttr= $0.0 76s 
+[18/126] s2-small-only-warm-1: resolved=0 diag=0 (none) mttr= $0.0 78s 
+[19/126] s3-hybrid-cold-1: resolved=1 diag=1 (memory_leak@worker) mttr=67.7 $0.01302 104s 
+[20/126] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=64.5 $0.0 99s 
+[21/126] s3-big-only-cold-1: resolved=1 diag=1 (memory_leak@worker) mttr=79.3 $0.04047 114s 
+[22/126] s3-big-only-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=76.6 $0.02987 111s 
+[23/126] s3-small-only-cold-1: resolved=1 diag=1 (memory_leak@worker) mttr=75.1 $0.0 110s 
+[24/126] s3-small-only-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=66.9 $0.0 101s 
+[25/126] s4-hybrid-cold-1: resolved=1 diag=1 (disk_full@api) mttr=69.4 $0.01267 104s 
+[26/126] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=63.6 $0.0 98s 
+[27/126] s4-big-only-cold-1: resolved=1 diag=1 (disk_full@api) mttr=66.3 $0.02109 101s 
+[28/126] s4-big-only-warm-1: resolved=1 diag=1 (disk_full@api) mttr=58.9 $0.00658 93s 
+[29/126] s4-small-only-cold-1: resolved=1 diag=1 (disk_full@api) mttr=75.1 $0.0 110s 
+[30/126] s4-small-only-warm-1: resolved=1 diag=1 (disk_full@api) mttr=62.7 $0.0 97s 
+[31/126] s5-hybrid-cold-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=75.2 $0.02343 110s 
+[32/126] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=76.1 $0.02293 111s 
+[33/126] s5-big-only-cold-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=71.4 $0.03239 106s 
+[34/126] s5-big-only-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=66.9 $0.02872 102s 
+[35/126] s5-small-only-cold-1: resolved=0 diag=0 (db_pool_exhaustion@db) mttr= $0.0 317s 
+[36/126] s5-small-only-warm-1: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[37/126] s6-hybrid-cold-1: resolved=1 diag=1 (cache_down@api) mttr=57.7 $0.01669 92s 
+[38/126] s6-hybrid-warm-1: resolved=1 diag=1 (cache_down@api) mttr=193.7 $0.03825 228s 
+[39/126] s6-big-only-cold-1: resolved=1 diag=1 (unknown@api) mttr=53.6 $0.02822 88s 
+[40/126] s6-big-only-warm-1: resolved=1 diag=1 (unknown@api) mttr=58.1 $0.03296 93s 
+[41/126] s6-small-only-cold-1: resolved=1 diag=1 (cache_down@api) mttr=373.7 $0.0 408s 
+[42/126] s6-small-only-warm-1: resolved=0 diag=1 (cache_down@api) mttr= $0.0 404s 
+[43/126] s0-hybrid-cold-2: resolved=1 diag=1 (none) mttr= $0 85s 
+[44/126] s0-hybrid-warm-2: resolved=1 diag=1 (none) mttr= $0 85s 
+[45/126] s0-big-only-cold-2: resolved=1 diag=1 (none) mttr= $0 86s 
+[46/126] s0-big-only-warm-2: resolved=1 diag=1 (none) mttr= $0 85s 
+[47/126] s0-small-only-cold-2: resolved=1 diag=1 (none) mttr= $0 85s 
+[48/126] s0-small-only-warm-2: resolved=1 diag=1 (none) mttr= $0 85s 
+[49/126] s1-hybrid-cold-2: resolved=1 diag=1 (cache_down@cache) mttr=55.6 $0.01508 90s 
+[50/126] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=45.2 $0.0 80s 
+[51/126] s1-big-only-cold-2: resolved=1 diag=1 (cache_down@cache) mttr=47.0 $0.02204 82s 
+[52/126] s1-big-only-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=40.1 $0.00706 75s 
+[53/126] s1-small-only-cold-2: resolved=1 diag=1 (cache_down@cache) mttr=57.4 $0.0 92s 
+[54/126] s1-small-only-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=44.2 $0.0 79s 
+[55/126] s2-hybrid-cold-2: resolved=1 diag=1 (db_auth_failure@api) mttr=68.7 $0.022 103s 
+[56/126] s2-hybrid-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=60.1 $0.00745 95s 
+[57/126] s2-big-only-cold-2: resolved=1 diag=1 (db_auth_failure@api) mttr=54.6 $0.02254 89s 
+[58/126] s2-big-only-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=47.6 $0.0075 82s 
+[59/126] s2-small-only-cold-2: resolved=0 diag=0 (none) mttr= $0.0 75s 
+[60/126] s2-small-only-warm-2: resolved=0 diag=0 (none) mttr= $0.0 74s 
+[61/126] s3-hybrid-cold-2: resolved=1 diag=1 (memory_leak@worker) mttr=67.3 $0.01262 103s 
+[62/126] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=66.4 $0.0 101s 
+[63/126] s3-big-only-cold-2: resolved=1 diag=1 (memory_leak@worker) mttr=78.4 $0.04077 113s 
+[64/126] s3-big-only-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=77.9 $0.03089 113s 
+[65/126] s3-small-only-cold-2: resolved=1 diag=1 (memory_leak@worker) mttr=72.8 $0.0 108s 
+[66/126] s3-small-only-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=66.4 $0.0 101s 
+[67/126] s4-hybrid-cold-2: resolved=1 diag=1 (disk_full@api) mttr=69.7 $0.0128 104s 
+[68/126] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=62.8 $0.0 97s 
+[69/126] s4-big-only-cold-2: resolved=1 diag=1 (disk_full@api) mttr=66.3 $0.02045 101s 
+[70/126] s4-big-only-warm-2: resolved=1 diag=1 (disk_full@api) mttr=59.1 $0.00664 94s 
+[71/126] s4-small-only-cold-2: resolved=1 diag=1 (disk_full@api) mttr=74.9 $0.0 109s 
+[72/126] s4-small-only-warm-2: resolved=1 diag=1 (disk_full@api) mttr=62.8 $0.0 97s 
+[73/126] s5-hybrid-cold-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=76.5 $0.02485 111s 
+[74/126] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=71.5 $0.0221 107s 
+[75/126] s5-big-only-cold-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=78.5 $0.04774 113s 
+[76/126] s5-big-only-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=69.0 $0.02974 104s 
+[77/126] s5-small-only-cold-2: resolved=1 diag=0 (cache_down@cache;slow_queries@db) mttr=100.7 $0.0 136s 
+[78/126] s5-small-only-warm-2: resolved=0 diag=0 (db_pool_exhaustion@db) mttr= $0.0 188s 
+[79/126] s6-hybrid-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[80/126] s6-hybrid-warm-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[81/126] s6-big-only-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[82/126] s6-big-only-warm-2: resolved=1 diag=1 (cache_down@api) mttr=192.4 $0.05134 227s 
+[83/126] s6-small-only-cold-2: resolved=0 diag=0 (none) mttr= $0.0 60s 
+[84/126] s6-small-only-warm-2: resolved=0 diag=1 (cache_down@api) mttr= $0.0 418s 
+[85/126] s0-hybrid-cold-3: resolved=1 diag=1 (none) mttr= $0 85s 
+[86/126] s0-hybrid-warm-3: resolved=1 diag=1 (none) mttr= $0 85s 
+[87/126] s0-big-only-cold-3: resolved=1 diag=1 (none) mttr= $0 84s 
+[88/126] s0-big-only-warm-3: resolved=1 diag=1 (none) mttr= $0 85s 
+[89/126] s0-small-only-cold-3: resolved=1 diag=1 (none) mttr= $0 85s 
+[90/126] s0-small-only-warm-3: resolved=1 diag=1 (none) mttr= $0 85s 
+[91/126] s1-hybrid-cold-3: resolved=1 diag=1 (cache_down@cache) mttr=57.3 $0.01677 91s 
+[92/126] s1-hybrid-warm-3: resolved=1 diag=1 (cache_down@cache) mttr=45.3 $0.0 80s 
+[93/126] s1-big-only-cold-3: resolved=1 diag=1 (cache_down@cache) mttr=47.3 $0.02265 82s 
+[94/126] s1-big-only-warm-3: resolved=1 diag=1 (cache_down@cache) mttr=41.0 $0.00741 76s 
+[95/126] s1-small-only-cold-3: resolved=1 diag=1 (cache_down@cache) mttr=58.5 $0.0 93s 
+[96/126] s1-small-only-warm-3: resolved=1 diag=1 (cache_down@cache) mttr=44.0 $0.0 79s 
+[97/126] s2-hybrid-cold-3: resolved=1 diag=1 (db_auth_failure@api) mttr=68.8 $0.02208 103s 
+[98/126] s2-hybrid-warm-3: resolved=1 diag=1 (db_auth_failure@api) mttr=59.7 $0.00765 94s 
+[99/126] s2-big-only-cold-3: resolved=1 diag=1 (db_auth_failure@api) mttr=53.1 $0.0219 88s 
+[100/126] s2-big-only-warm-3: resolved=1 diag=1 (db_auth_failure@api) mttr=47.6 $0.00743 82s 
+[101/126] s2-small-only-cold-3: resolved=0 diag=0 (none) mttr= $0.0 76s 
+[102/126] s2-small-only-warm-3: resolved=0 diag=0 (none) mttr= $0.0 76s 
+[103/126] s3-hybrid-cold-3: resolved=1 diag=1 (memory_leak@worker) mttr=68.1 $0.0123 104s 
+[104/126] s3-hybrid-warm-3: resolved=1 diag=1 (memory_leak@worker) mttr=83.3 $0.0 118s 
+[105/126] s3-big-only-cold-3: resolved=1 diag=1 (memory_leak@worker) mttr=84.5 $0.04923 119s 
+[106/126] s3-big-only-warm-3: resolved=1 diag=1 (memory_leak@worker) mttr=79.5 $0.03179 114s 
+[107/126] s3-small-only-cold-3: resolved=1 diag=1 (memory_leak@worker) mttr=76.4 $0.0 111s 
+[108/126] s3-small-only-warm-3: resolved=1 diag=1 (memory_leak@worker) mttr=66.9 $0.0 101s 
+[109/126] s4-hybrid-cold-3: resolved=1 diag=1 (disk_full@api) mttr=71.0 $0.01349 106s 
+[110/126] s4-hybrid-warm-3: resolved=1 diag=1 (disk_full@api) mttr=63.2 $0.0 98s 
+[111/126] s4-big-only-cold-3: resolved=1 diag=1 (disk_full@api) mttr=66.5 $0.02056 101s 
+[112/126] s4-big-only-warm-3: resolved=1 diag=1 (disk_full@api) mttr=59.6 $0.00657 94s 
+[113/126] s4-small-only-cold-3: resolved=1 diag=1 (disk_full@api) mttr=75.0 $0.0 110s 
+[114/126] s4-small-only-warm-3: resolved=1 diag=1 (disk_full@api) mttr=62.8 $0.0 98s 
+[115/126] s5-hybrid-cold-3: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=75.0 $0.02214 109s 
+[116/126] s5-hybrid-warm-3: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=72.1 $0.02386 107s 
+[117/126] s5-big-only-cold-3: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=94.1 $0.07137 129s 
+[118/126] s5-big-only-warm-3: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=69.2 $0.02866 104s 
+[119/126] s5-small-only-cold-3: resolved=0 diag=0 (cache_down@cache) mttr= $0.0 197s 
+[120/126] s5-small-only-warm-3: resolved=0 diag=0 (db_pool_exhaustion@db) mttr= $0.0 418s 
+[121/126] s6-hybrid-cold-3: resolved=1 diag=1 (cache_down@api) mttr=57.7 $0.01778 94s 
+[122/126] s6-hybrid-warm-3: resolved=1 diag=1 (cache_down@api) mttr=197.3 $0.04079 232s 
+[123/126] s6-big-only-cold-3: resolved=1 diag=1 (unknown@api) mttr=58.6 $0.03332 93s 
+[124/126] s6-big-only-warm-3: resolved=1 diag=1 (unknown@api) mttr=53.4 $0.02678 88s 
+[125/126] s6-small-only-cold-3: resolved=1 diag=1 (cache_down@api) mttr=380.2 $0.0 414s 
+[126/126] s6-small-only-warm-3: resolved=0 diag=1 (cache_down@api) mttr= $0.0 465s 
+# Benchmark results
+
+126 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | cold | 18 | 94% | 94% | 94% | 94% | 66.5 | 1.11 | 0.0 | 1.11 | 0.0164 | 0.295 |
+| hybrid | warm | 18 | 94% | 83% | 94% | 94% | 78.2 | 1.39 | 0.11 | 0.44 | 0.0095 | 0.171 |
+| big-only | cold | 18 | 94% | 94% | 94% | 94% | 64.9 | 1.11 | 0.0 | 0.0 | 0.0299 | 0.538 |
+| big-only | warm | 18 | 100% | 100% | 100% | 100% | 65.8 | 1.39 | 0.06 | 0.0 | 0.0197 | 0.355 |
+| small-only | cold | 18 | 61% | 61% | 67% | 61% | 123.1 | 1.06 | 0.28 | 0.0 | 0.0 | 0.0 |
+| small-only | warm | 18 | 67% | 61% | 50% | 50% | 57.9 | 1.11 | 0.33 | 0.0 | 0.0 | 0.0 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+| hybrid | 6 | 0 | 0 |
+| big-only | 6 | 0 | 0 |
+| small-only | 6 | 0 | 0 |
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | hybrid | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | hybrid | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | big-only | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | big-only | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | small-only | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | small-only | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 1 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 56.4 | 1.0 | 0.0 | 1.0 | 0.0158 | 0.047 | 0.4 |
+| 1 | hybrid | warm | 3 | 100% | 33% | 100% | 100% | 45.1 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 1 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 46.9 | 1.0 | 0.0 | 0.0 | 0.0221 | 0.066 | 0.5 |
+| 1 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 40.7 | 1.0 | 0.0 | 0.0 | 0.0073 | 0.022 | 0.5 |
+| 1 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 57.9 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 1 | small-only | warm | 3 | 100% | 67% | 100% | 100% | 44.1 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.4 |
+| 2 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 68.9 | 1.0 | 0.0 | 2.0 | 0.0219 | 0.066 | 3.4 |
+| 2 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 59.9 | 1.0 | 0.0 | 1.0 | 0.0076 | 0.023 | 3.4 |
+| 2 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 55.2 | 1.0 | 0.0 | 0.0 | 0.0219 | 0.066 | 4.1 |
+| 2 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 47.6 | 1.0 | 0.0 | 0.0 | 0.0074 | 0.022 | 4.1 |
+| 2 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.3 |
+| 2 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.7 |
+| 3 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 67.7 | 1.0 | 0.0 | 1.0 | 0.0126 | 0.038 | 22.1 |
+| 3 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 71.4 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.8 |
+| 3 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 80.7 | 1.0 | 0.0 | 0.0 | 0.0435 | 0.13 | 22.1 |
+| 3 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 78.0 | 2.0 | 0.0 | 0.0 | 0.0308 | 0.093 | 21.3 |
+| 3 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 74.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.7 |
+| 3 | small-only | warm | 3 | 100% | 100% | 100% | 100% | 66.7 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 22.0 |
+| 4 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 70.0 | 1.0 | 0.0 | 1.0 | 0.013 | 0.039 | 17.5 |
+| 4 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 63.2 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.7 |
+| 4 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 66.4 | 1.0 | 0.0 | 0.0 | 0.0207 | 0.062 | 17.8 |
+| 4 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 59.2 | 1.0 | 0.0 | 0.0 | 0.0066 | 0.02 | 17.1 |
+| 4 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 75.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.8 |
+| 4 | small-only | warm | 3 | 100% | 100% | 100% | 100% | 62.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.8 |
+| 5 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 75.6 | 2.0 | 0.0 | 1.0 | 0.0235 | 0.07 | 8.3 |
+| 5 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 73.2 | 2.0 | 0.0 | 1.0 | 0.023 | 0.069 | 7.7 |
+| 5 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 81.3 | 2.0 | 0.0 | 0.0 | 0.0505 | 0.152 | 6.7 |
+| 5 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 68.4 | 2.0 | 0.0 | 0.0 | 0.029 | 0.087 | 7.6 |
+| 5 | small-only | cold | 3 | 0% | 0% | 33% | 0% | 100.7 | 1.33 | 0.33 | 0.0 | 0.0 | 0.0 | 5.8 |
+| 5 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 0.33 | 0.0 | 0.0 | 0.0 | 7.5 |
+| 6 | hybrid | cold | 3 | 67% | 67% | 67% | 67% | 57.7 | 0.67 | 0.0 | 0.67 | 0.0115 | 0.034 | 1.9 |
+| 6 | hybrid | warm | 3 | 67% | 67% | 67% | 67% | 195.5 | 1.33 | 0.67 | 0.67 | 0.0263 | 0.079 | 1.9 |
+| 6 | big-only | cold | 3 | 67% | 67% | 67% | 67% | 56.1 | 0.67 | 0.0 | 0.0 | 0.0205 | 0.062 | 1.9 |
+| 6 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 101.3 | 1.33 | 0.33 | 0.0 | 0.037 | 0.111 | 1.9 |
+| 6 | small-only | cold | 3 | 67% | 67% | 67% | 67% | 376.9 | 2.0 | 1.33 | 0.0 | 0.0 | 0.0 | 1.7 |
+| 6 | small-only | warm | 3 | 100% | 100% | 0% | 0% |  | 1.67 | 1.67 | 0.0 | 0.0 | 0.0 | 1.9 |
+
+## Where small-only fails (not correct & recovered)
+
+| run | diagnosed | truth | resolved | actions | error |
+|---|---|---|---|---|---|
+| s2-small-only-cold-1 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-1 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-1 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s5-small-only-warm-1 |  | cache_down@cache;db_pool_exhaustion@db | 0 |  | CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1. |
+| s6-small-only-warm-1 | cache_down@api | *@api | 0 | restart(api) |  |
+| s2-small-only-cold-2 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-2 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-2 | cache_down@cache;slow_queries@db | cache_down@cache;db_pool_exhaustion@db | 1 | restart(cache);scale(db) |  |
+| s5-small-only-warm-2 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s6-small-only-cold-2 | none | *@api | 0 |  |  |
+| s6-small-only-warm-2 | cache_down@api | *@api | 0 | restart(api) |  |
+| s2-small-only-cold-3 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-3 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-3 | cache_down@cache | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s5-small-only-warm-3 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache);scale(db) |  |
+| s6-small-only-warm-3 | cache_down@api | *@api | 0 | restart(api);restart(api);restart(api) |  |
+
+## Invariant violations: 0
+
+## Errors: 4
+- s5-small-only-warm-1: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-hybrid-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-hybrid-warm-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-big-only-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+4 runs to do (122 already done)
+[1/4] s5-small-only-warm-1: resolved=0 diag=0 (cache_down@cache;slow_queries@db) mttr= $0.0 62s 
+[2/4] s6-hybrid-cold-2: resolved=1 diag=1 (cache_down@api) mttr=61.1 $0.01958 96s 
+[3/4] s6-hybrid-warm-2: resolved=1 diag=1 (cache_down@api) mttr=204.1 $0.0462 239s 
+[4/4] s6-big-only-cold-2: resolved=1 diag=1 (cache_down@api) mttr=58.0 $0.02987 93s 
+# Benchmark results
+
+126 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | cold | 18 | 100% | 100% | 100% | 100% | 66.2 | 1.17 | 0.0 | 1.17 | 0.0175 | 0.314 |
+| hybrid | warm | 18 | 100% | 89% | 100% | 100% | 85.2 | 1.5 | 0.17 | 0.5 | 0.0121 | 0.217 |
+| big-only | cold | 18 | 100% | 100% | 100% | 100% | 64.5 | 1.17 | 0.0 | 0.0 | 0.0315 | 0.567 |
+| big-only | warm | 18 | 100% | 100% | 100% | 100% | 65.8 | 1.39 | 0.06 | 0.0 | 0.0197 | 0.355 |
+| small-only | cold | 18 | 61% | 61% | 67% | 61% | 123.1 | 1.06 | 0.28 | 0.0 | 0.0 | 0.0 |
+| small-only | warm | 18 | 67% | 61% | 50% | 50% | 57.9 | 1.11 | 0.33 | 0.0 | 0.0 | 0.0 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+| hybrid | 6 | 0 | 0 |
+| big-only | 6 | 0 | 0 |
+| small-only | 6 | 0 | 0 |
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0 | hybrid | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | hybrid | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | big-only | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | big-only | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | small-only | cold | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 0 | small-only | warm | 3 | 100% | 100% | 100% | 100% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 1 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 56.4 | 1.0 | 0.0 | 1.0 | 0.0158 | 0.047 | 0.4 |
+| 1 | hybrid | warm | 3 | 100% | 33% | 100% | 100% | 45.1 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 1 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 46.9 | 1.0 | 0.0 | 0.0 | 0.0221 | 0.066 | 0.5 |
+| 1 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 40.7 | 1.0 | 0.0 | 0.0 | 0.0073 | 0.022 | 0.5 |
+| 1 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 57.9 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 1 | small-only | warm | 3 | 100% | 67% | 100% | 100% | 44.1 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.4 |
+| 2 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 68.9 | 1.0 | 0.0 | 2.0 | 0.0219 | 0.066 | 3.4 |
+| 2 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 59.9 | 1.0 | 0.0 | 1.0 | 0.0076 | 0.023 | 3.4 |
+| 2 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 55.2 | 1.0 | 0.0 | 0.0 | 0.0219 | 0.066 | 4.1 |
+| 2 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 47.6 | 1.0 | 0.0 | 0.0 | 0.0074 | 0.022 | 4.1 |
+| 2 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.3 |
+| 2 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.7 |
+| 3 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 67.7 | 1.0 | 0.0 | 1.0 | 0.0126 | 0.038 | 22.1 |
+| 3 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 71.4 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.8 |
+| 3 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 80.7 | 1.0 | 0.0 | 0.0 | 0.0435 | 0.13 | 22.1 |
+| 3 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 78.0 | 2.0 | 0.0 | 0.0 | 0.0308 | 0.093 | 21.3 |
+| 3 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 74.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.7 |
+| 3 | small-only | warm | 3 | 100% | 100% | 100% | 100% | 66.7 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 22.0 |
+| 4 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 70.0 | 1.0 | 0.0 | 1.0 | 0.013 | 0.039 | 17.5 |
+| 4 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 63.2 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.7 |
+| 4 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 66.4 | 1.0 | 0.0 | 0.0 | 0.0207 | 0.062 | 17.8 |
+| 4 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 59.2 | 1.0 | 0.0 | 0.0 | 0.0066 | 0.02 | 17.1 |
+| 4 | small-only | cold | 3 | 100% | 100% | 100% | 100% | 75.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.8 |
+| 4 | small-only | warm | 3 | 100% | 100% | 100% | 100% | 62.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.8 |
+| 5 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 75.6 | 2.0 | 0.0 | 1.0 | 0.0235 | 0.07 | 8.3 |
+| 5 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 73.2 | 2.0 | 0.0 | 1.0 | 0.023 | 0.069 | 7.7 |
+| 5 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 81.3 | 2.0 | 0.0 | 0.0 | 0.0505 | 0.152 | 6.7 |
+| 5 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 68.4 | 2.0 | 0.0 | 0.0 | 0.029 | 0.087 | 7.6 |
+| 5 | small-only | cold | 3 | 0% | 0% | 33% | 0% | 100.7 | 1.33 | 0.33 | 0.0 | 0.0 | 0.0 | 5.8 |
+| 5 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 0.33 | 0.0 | 0.0 | 0.0 | 7.0 |
+| 6 | hybrid | cold | 3 | 100% | 100% | 100% | 100% | 58.8 | 1.0 | 0.0 | 1.0 | 0.018 | 0.054 | 2.0 |
+| 6 | hybrid | warm | 3 | 100% | 100% | 100% | 100% | 198.4 | 2.0 | 1.0 | 1.0 | 0.0417 | 0.125 | 1.9 |
+| 6 | big-only | cold | 3 | 100% | 100% | 100% | 100% | 56.7 | 1.0 | 0.0 | 0.0 | 0.0305 | 0.091 | 1.9 |
+| 6 | big-only | warm | 3 | 100% | 100% | 100% | 100% | 101.3 | 1.33 | 0.33 | 0.0 | 0.037 | 0.111 | 1.9 |
+| 6 | small-only | cold | 3 | 67% | 67% | 67% | 67% | 376.9 | 2.0 | 1.33 | 0.0 | 0.0 | 0.0 | 1.7 |
+| 6 | small-only | warm | 3 | 100% | 100% | 0% | 0% |  | 1.67 | 1.67 | 0.0 | 0.0 | 0.0 | 1.9 |
+
+## Where small-only fails (not correct & recovered)
+
+| run | diagnosed | truth | resolved | actions | error |
+|---|---|---|---|---|---|
+| s2-small-only-cold-1 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-1 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-1 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s6-small-only-warm-1 | cache_down@api | *@api | 0 | restart(api) |  |
+| s2-small-only-cold-2 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-2 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-2 | cache_down@cache;slow_queries@db | cache_down@cache;db_pool_exhaustion@db | 1 | restart(cache);scale(db) |  |
+| s5-small-only-warm-2 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s6-small-only-cold-2 | none | *@api | 0 |  |  |
+| s6-small-only-warm-2 | cache_down@api | *@api | 0 | restart(api) |  |
+| s2-small-only-cold-3 | none | db_auth_failure@api | 0 |  |  |
+| s2-small-only-warm-3 | none | db_auth_failure@api | 0 |  |  |
+| s5-small-only-cold-3 | cache_down@cache | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
+| s5-small-only-warm-3 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache);scale(db) |  |
+| s6-small-only-warm-3 | cache_down@api | *@api | 0 | restart(api);restart(api);restart(api) |  |
+| s5-small-only-warm-1 | cache_down@cache;slow_queries@db | cache_down@cache;db_pool_exhaustion@db | 0 |  |  |
+
+## Invariant violations: 0
+
+## Errors: 0
