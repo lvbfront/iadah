@@ -60,8 +60,10 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
 | `agent/invariants.py` | post-incident invariant checks |
 | `agent/runbooks.py` | `list` / `approve` / `hide` / `restore` / `delete` for runbooks (CLI + used by the dashboard) |
 | `dashboard/app.py`, `dashboard/index.html` | live demo dashboard (FastAPI + SSE, one static page), replay, web approval |
-| `chaos.py` | scenarios 0–6 + `reset`; `TRUTH`, `EXPECTED_ACTIONS`, `diag_correct` |
-| `benchmarks/run.py` | benchmark (resumable, sleep guard) → `benchmarks/results.{csv,md}`; v1 in `benchmarks/v1/` |
+| `chaos.py` | scenarios 0–8 + `reset`; `TRUTH`, `EXPECTED_ACTIONS`, `diag_correct` (6–8 held out) |
+| `benchmarks/run.py` | benchmark (resumable, sleep guard, `--out`, `--ablate`) → `benchmarks/results.{csv,md}` (v2); v1 in `benchmarks/v1/`; held-out 7–8 in `benchmarks/heldout/`; ablation in `benchmarks/ablation/` |
+| `benchmarks/compare.py` | ablation table; regression check of a result dir vs committed v2 |
+| `scripts/eval.sh` | one command: fail-safe → smoke → benchmark → regression check (`quick` / `full`) |
 | `tests/failsafe.py` | break-the-agent cases (Ollama down, Claude down, bad JSON, no topology, action throws) |
 | `demo/` | target system: api, worker, db, cache, traffic |
 | `runbooks/` | seed runbooks (approved) + learned (`*.learned.yaml`, pending review) |
@@ -80,6 +82,9 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
   - 4: api scratch tmpfs full
   - 5: redis down + DB connection exhaustion
   - 6: **held out**, wrong REDIS_HOST after deploy, graded on the root service. No prompt or runbook was tuned for it.
+  - 7: **held out**, worker deployed with read-only DB credentials (root: worker).
+  - 8: **held out**, forgotten migration holding a table lock (root: db).
+  - 7 and 8 were designed and implemented by a separate agent that saw only `demo/`; its ground truth is used as-is.
 - `agent.run --scenario N` always runs `chaos.reset()` first.
 - Runbooks in git are approved seeds with `times_used: 0`. Reset counters before committing. **Never commit a learned scenario-5 combo runbook** (it's recorded live).
 - Benchmarks always run under `caffeinate -dimsu`. Runs where the machine slept more than 60s are rerun.
@@ -92,6 +97,9 @@ The agent never touches Docker directly. It goes through `adapters/base.py` (`Ob
 - **Expected actions** per scenario are strict. restart(db) for scenario 5 and restart(api) for scenario 4 count as unnecessary.
 - **Harness errors are rerun, agent failures are not.** In v2, 4 runs failed in 1s inside `chaos.reset()`: `compose up` waits for db to be healthy, and db was still exhausted after a small-only scenario 5 run. `reset` now retries for up to 60s. Only those 4 rows were deleted and rerun; every agent outcome stands as recorded.
 - **Primary diagnosis accuracy** grades the agent's final roots (model output minus topology symptoms). Model-raw accuracy is reported alongside.
+
+- **Ablation switches** (`config.ABLATE`, empty by default, set only by `benchmarks/run.py --ablate`): `guard`, `compress`, `fastpath`, `verify`. Under `verify` the invariant uses the ablated window (0s), so that false recoveries show up as `still_ok=0` instead of being masked as violations.
+- **Ablation is hybrid, warm only** (the fast path only exists with runbooks), n=2, with its own `full` baseline run in the same session.
 
 ## Known limitations
 - **Incident vocabulary is small and maps closely onto scenarios 1–5** (only `slow_queries` is a decoy). Warm runs are close to scripted. Scenario 6 and the cold condition are the honest tests.
@@ -114,6 +122,7 @@ uv run python -m agent.runbooks list | approve <name>
 caffeinate -dimsu uv run python -u -m benchmarks.run > benchmarks/run.log 2>&1
 uv run python -m tests.failsafe
 uv run python -m dashboard.app                               # → http://localhost:8080
+scripts/eval.sh [quick|full]                                 # fail-safe + smoke + benchmark + regression check
 ```
 
 ## Progress

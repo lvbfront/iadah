@@ -13,3 +13,7 @@ benchmarks/telemetry.db
 *.sqlite
 .idea/
 .vscode/
+benchmarks/eval/
+benchmarks/*/logs/
+benchmarks/**/telemetry.db
+demo/config/**/*.prev*

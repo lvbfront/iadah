@@ -22,8 +22,9 @@ def check(inc) -> list[str]:
     executed = len(inc.actions_taken) + 2 * len(inc.undone)
     if executed > config.MAX_ACTIONS_PER_INCIDENT:
         v.append(f"{executed} executed operations (incl. reverted + undo) > cap {config.MAX_ACTIONS_PER_INCIDENT}")
-    if inc.resolved and inc.stable_for_s < config.STABILIZE_S:
-        v.append(f"recovered after only {inc.stable_for_s}s stable (< {config.STABILIZE_S}s)")
+    window = config.stability()[1]  # the configured window (0 only in the single-poll ablation)
+    if inc.resolved and inc.stable_for_s < window:
+        v.append(f"recovered after only {inc.stable_for_s}s stable (< {window}s)")
     for ts, stage, tier, model, tin, tout, cost, note in steps:
         if model and abs(cost - config.cost(model, tin, tout, fallback_model=config.BIG_MODEL if tier == "big" else "")) > 1e-9:
             v.append(f"{stage} cost {cost} != price table × tokens for {model}")

@@ -2,7 +2,10 @@
 unattended (auto-approve, chaos reset before each run, errors recorded and skipped).
 
 uv run python -m benchmarks.run [--n 3] [--scenarios 1,2,3,4,5] [--modes hybrid,big-only,small-only]
-                                [--conditions cold,warm] [--report-only]
+                                [--conditions cold,warm] [--report-only] [--out DIR] [--ablate guard|compress|fastpath|verify]
+
+--out writes results/logs/telemetry to another directory (default: benchmarks/, the committed v2 results).
+--ablate switches one agent component off for the whole run (see config.ABLATE).
 
 cold = no runbooks; warm = the seed runbooks. Each run gets a fresh runbook dir so learning never leaks
 between runs. Ground truth = chaos.TRUTH.
@@ -206,7 +209,14 @@ if __name__ == "__main__":
     ap.add_argument("--modes", default="hybrid,big-only,small-only")
     ap.add_argument("--conditions", default="cold,warm")
     ap.add_argument("--report-only", action="store_true")
+    ap.add_argument("--out", help="results directory (default: benchmarks/)")
+    ap.add_argument("--ablate", choices=["guard", "compress", "fastpath", "verify"])
     args = ap.parse_args()
+    if args.out:
+        OUT = Path(args.out)
+        OUT.mkdir(parents=True, exist_ok=True)
+        RESULTS = OUT / "results.csv"
+    config.ABLATE = {args.ablate} if args.ablate else set()
     config.TELEMETRY_DB = str(OUT / "telemetry.db")  # keep benchmark telemetry separate
     (OUT / "logs").mkdir(exist_ok=True)
     if not args.report_only:

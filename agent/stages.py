@@ -213,7 +213,8 @@ def compress_logs(inc: Incident, obs):
     blast = {s for s, deps in topo.items() if bad & set(deps)}  # dependents see the fault first in their logs
     for svc in sorted(bad | blast):
         lines = obs.get_logs(svc, tail=500, since_s=_since(inc))
-        inc.log_digest[svc] = compress_lines(lines)
+        inc.log_digest[svc] = compress_lines(lines) if "compress" not in config.ABLATE else \
+            [DOCKER_TS.sub("", line) for line in lines]
         n += len(lines)
         raw += est_tokens("\n".join(lines))
         comp += est_tokens("\n".join(inc.log_digest[svc]))
@@ -258,9 +259,9 @@ def is_ambiguous(inc: Incident) -> bool:
 
 def fast_path(inc: Incident) -> bool:
     """High-confidence triage of a known signature: skip investigate + diagnose."""
-    if inc.iteration > 1 or is_ambiguous(inc) or not _known(inc, inc.triage):
+    if "fastpath" in config.ABLATE or inc.iteration > 1 or is_ambiguous(inc) or not _known(inc, inc.triage):
         return False
-    if {rc["service"] for rc in inc.triage["root_causes"]} != set(inc.suspects):
+    if "guard" not in config.ABLATE and {rc["service"] for rc in inc.triage["root_causes"]} != set(inc.suspects):
         telemetry.log_step(inc.id, "fast-path", note=f"no fast path: triage roots "
                            f"{sorted({rc['service'] for rc in inc.triage['root_causes']})} ≠ topology suspects {inc.suspects}")
         return False
@@ -278,6 +279,8 @@ def roots_consistent(inc: Incident, d: dict) -> bool:
     unhealthy service, and at least one of them is not a topology symptom. A mismatch is treated like
     invalid output (retry once, then escalate / hand to a human); it is NEVER silently rewritten."""
     rcs = d.get("root_causes") or []
+    if "guard" in config.ABLATE:
+        return bool(rcs)
     return bool(rcs) and all(rc["service"] in inc.unhealthy for rc in rcs) and \
         any(rc["service"] not in inc.symptoms for rc in rcs)
 
@@ -292,7 +295,7 @@ def _resolve_roots(inc: Incident):
     d = inc.diagnosis
     inc.model_roots = d.get("raw_root_causes", d.get("root_causes", []))
     inc.roots = [{"incident_type": rc["incident_type"], "service": rc["service"]}
-                 for rc in d["root_causes"] if rc["service"] not in inc.symptoms]
+                 for rc in d["root_causes"] if rc["service"] not in inc.symptoms or "guard" in config.ABLATE]
     inc.root_service = inc.roots[0]["service"]
 
 
@@ -300,7 +303,7 @@ def _drop_symptom_roots(inc: Incident, d: dict | None):
     """A service failing only because a dependency failed is a symptom, never a root cause."""
     if d:
         d.setdefault("raw_root_causes", [dict(rc) for rc in d.get("root_causes", [])])
-    if d and inc.symptoms:
+    if d and inc.symptoms and "guard" not in config.ABLATE:
         keep = [rc for rc in d.get("root_causes", []) if rc["service"] not in inc.symptoms]
         if len(keep) < len(d.get("root_causes", [])):
             telemetry.log_step(inc.id, "route", note=f"dropped symptom roots on {inc.symptoms} (topology)")
@@ -547,6 +550,7 @@ def verify(inc: Incident, obs):
     diagnosed root cause passes its fault-specific check. Any failing poll restarts the streak."""
     t0 = time.perf_counter()
     report, streak, since, mem0 = {}, 0, None, {}
+    polls, window = config.stability()
     while time.perf_counter() - t0 < config.VERIFY_TIMEOUT_S:
         health = obs.get_health()
         report = flags(health, inc.baseline, strict=True) or fault_checks(inc, obs, health, mem0)
@@ -555,11 +559,11 @@ def verify(inc: Incident, obs):
         else:
             streak += 1
             since = since or time.perf_counter()  # monotonic: machine sleep doesn't count as "stable"
-            if streak >= config.STABLE_POLLS and time.perf_counter() - since >= config.STABILIZE_S:
+            if streak >= polls and time.perf_counter() - since >= window:
                 break
         time.sleep(config.VERIFY_POLL_S)
     inc.stable_for_s = round(time.perf_counter() - since, 1) if since else 0.0
-    inc.resolved = (not report and streak >= config.STABLE_POLLS and inc.stable_for_s >= config.STABILIZE_S)
+    inc.resolved = (not report and streak >= polls and inc.stable_for_s >= window)
     if not report and not inc.resolved:
         report = {"*": f"healthy for only {inc.stable_for_s}s / {streak} polls before timeout"}
     inc.failed_fix = not inc.resolved

@@ -29,6 +29,16 @@ VERIFY_TIMEOUT_S = 90       # give up verifying after this long
 STABLE_POLLS = 3            # recovered = this many consecutive healthy polls…
 STABILIZE_S = 20            # …spanning at least this long
 VERIFY_POLL_S = 3
+
+# Ablation study only (benchmarks/run.py --ablate): switch one component off. Empty = the real agent.
+#   guard = topology consistency gate + symptom filtering, compress = drain3 log templates,
+#   fastpath = runbook fast path, verify = stabilization window (single healthy poll instead)
+ABLATE: set[str] = set(filter(None, os.getenv("ABLATE", "").split(",")))
+
+
+def stability() -> tuple[int, float]:
+    """(polls, seconds) a recovery must hold before it counts."""
+    return (1, 0.0) if "verify" in ABLATE else (STABLE_POLLS, STABILIZE_S)
 DETECT_WINDOW_S = 90        # give up waiting for a detection after this long
 CONTROL_WINDOW_S = 60       # scenario 0 (no fault): watch a healthy system this long
 MAX_ACTIONS_PER_INCIDENT = 6  # hard cap; reaching it hands the incident to a human
