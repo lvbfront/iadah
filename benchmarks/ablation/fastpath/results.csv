@@ -1,0 +1,13 @@
+key,scenario,mode,condition,rep,incident,detected,resolved,still_ok,diag_correct,diag_model_raw,correct_and_recovered,diagnosed,diagnosed_raw,actions,unnecessary_actions,undone_actions,actions_taken,mttd_s,mttr_s,iterations,escalations,tokens,big_tokens,cost_usd,invariant_violations,sleep_gap_s,invalid,error
+s1-hybrid-warm-1,1,hybrid,warm,1,inc-20261030-222324,1,1,1,1,1,1,cache_down@cache,cache_down@cache,1,0,0,restart(cache),0.4,55.7,1,0,3301,0,0.0,,-0.0,0,
+s2-hybrid-warm-1,2,hybrid,warm,1,inc-20261030-222455,1,1,1,1,1,1,db_auth_failure@api,db_auth_failure@api,1,0,0,rollback_config(api),3.0,70.5,1,1,7521,2509,0.0076,,-0.0,0,
+s3-hybrid-warm-1,3,hybrid,warm,1,inc-20261030-222640,1,1,1,1,1,1,memory_leak@worker,memory_leak@worker,2,0,0,restart(worker);scale(worker),22.2,86.7,1,0,2665,0,0.0,,-0.0,0,
+s4-hybrid-warm-1,4,hybrid,warm,1,inc-20261030-222843,1,1,1,1,1,1,disk_full@api,disk_full@api,1,0,0,clear_disk(api),18.5,84.0,1,0,3014,0,0.0,,-0.0,0,
+s5-hybrid-warm-1,5,hybrid,warm,1,inc-20261030-223045,1,1,1,1,1,1,cache_down@cache;db_pool_exhaustion@db,cache_down@cache;db_pool_exhaustion@db,2,0,0,restart(cache);kill_idle_connections(db),7.8,73.9,1,1,7838,6208,0.02382,,-0.0,0,
+s6-hybrid-warm-1,6,hybrid,warm,1,inc-20261030-223234,1,1,1,1,1,1,unknown@api,unknown@api,1,0,0,rollback_config(api),1.9,68.0,1,2,11749,8711,0.02695,,-0.0,0,
+s1-hybrid-warm-2,1,hybrid,warm,2,inc-20261030-223417,1,1,1,1,1,1,cache_down@cache,cache_down@cache,1,0,0,restart(cache),0.4,54.5,1,0,3251,0,0.0,,-0.0,0,
+s2-hybrid-warm-2,2,hybrid,warm,2,inc-20261030-223546,1,1,1,1,1,1,db_auth_failure@api,db_auth_failure@api,1,0,0,rollback_config(api),4.0,72.9,1,1,7543,2484,0.00735,,-0.0,0,
+s3-hybrid-warm-2,3,hybrid,warm,2,inc-20261030-223734,1,1,1,1,1,1,memory_leak@worker,memory_leak@worker,2,0,0,restart(worker);scale(worker),21.8,76.3,1,0,2689,0,0.0,,-0.0,0,
+s4-hybrid-warm-2,4,hybrid,warm,2,inc-20261030-223925,1,1,1,1,1,1,disk_full@api,disk_full@api,1,0,0,clear_disk(api),17.5,72.3,1,0,3016,0,0.0,,-0.0,0,
+s5-hybrid-warm-2,5,hybrid,warm,2,inc-20261030-224112,1,1,1,1,1,1,cache_down@cache;db_pool_exhaustion@db,cache_down@cache;db_pool_exhaustion@db,2,0,0,restart(cache);kill_idle_connections(db),7.1,73.2,1,1,7538,5930,0.02195,,-0.0,0,
+s6-hybrid-warm-2,6,hybrid,warm,2,inc-20261030-224300,1,1,1,1,1,1,unknown@api,unknown@api,1,0,0,rollback_config(api),1.8,75.7,1,2,14263,11243,0.03917,,-0.0,0,

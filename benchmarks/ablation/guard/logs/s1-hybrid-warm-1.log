@@ -1,0 +1,27 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.58}}; last-known-good 
+configs saved
+───────────────── inc-20261030-211540  scenario=1  mode=hybrid ─────────────────
+   0.4s inject       RULES              0.00s $0.00000   chaos scenario 1: redis down
+   0.5s detect       RULES              0.00s $0.00000   first alert {'cache': 'status=down'}; grouping for 3s
+   3.6s detect       RULES              0.08s $0.00000   unhealthy={'cache': 'status=down', 'api': 'error_rate=0.311 (baseline 0.0)'} → root suspects=['cache'] symptoms=['api']
+   3.8s compress     RULES              0.17s $0.00000   ['api', 'cache', 'traffic', 'worker']: 147 log lines → 10 templates; ~3568 → ~191 tokens (19x smaller)
+   5.0s gather       RULES              1.21s $0.00000   2 parallel metric reads ['api', 'cache'] in code
+  13.0s triage       SMALL   1321→143   7.95s $0.00000  qwen3.5:4b roots=[('cache_down', 'cache'), ('slow_queries', 'api')] conf=0.95 sev=high
+  13.0s route        RULES              0.00s $0.00000   → big: 2 independent root causes
+  13.0s investigate  RULES              0.00s $0.00000   skipped: not ambiguous (conf 0.95), code-gathered evidence suffices
+  26.2s diagnose      BIG    2781→868  13.11s $0.01424  claude-sonnet-5-5 roots=[('cache_down', 'cache')] conf=0.95 — Cache container was stopped by SIGTERM (graceful shutdown with final RDB save) a (pack ~698 tok)
+  26.2s plan         RULES              0.00s $0.00000   runbook:cache_down → dependency order: restart(cache)
+  26.4s act          RULES              0.16s $0.00000    restarted cache (1 replica(s))
+  31.7s verify-fix   RULES              5.31s $0.00000   cache is healthy
+  58.4s verify       RULES             21.64s $0.00000   recovered: 8 consecutive healthy polls over 21.5s, fault checks pass for ['cache_down@cache']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.4, 'window_requests': 45}}
+  58.5s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-211540.md; runbook → cache_down.yaml (times_used=1)
+                         RESOLVED  inc-20261030-211540                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 0.5s │ 58.3s │          1 │           1 │       5113 │ $0.01424 │   3568→191 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+    BIG   claude-sonnet-5-5: 1 calls, 2781→868 tok, 13.1s, $0.01424
+   SMALL  qwen3.5:4b: 1 calls, 1321→143 tok, 8.0s, $0.00000

@@ -1,0 +1,42 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.58}}; last-known-good 
+configs saved
+───────────────── inc-20261030-215024  scenario=6  mode=hybrid ─────────────────
+   0.8s inject       RULES              0.00s $0.00000   chaos scenario 6: HELD-OUT: wrong REDIS_HOST in api config after deploy
+   1.9s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=1.0 (baseline 0.0)'}; grouping for 3s
+   5.0s detect       RULES              0.07s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+   5.1s compress     RULES              0.07s $0.00000   ['api', 'traffic']: 160 log lines → 9 templates; ~3869 → ~116 tokens (33x smaller)
+   7.2s gather       RULES              2.13s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  14.0s triage       SMALL   1304→116   6.79s $0.00000  qwen3.5:4b roots=[('cache_down', 'api')] conf=0.95 sev=high
+  14.0s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  14.0s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['cache_down'] → skip investigate/diagnose
+  14.1s plan         RULES              0.00s $0.00000   runbook:cache_down → dependency order: restart(api)
+  14.6s act          RULES              0.45s $0.00000    restarted api (1 replica(s))
+  45.1s verify-fix   RULES             30.50s $0.00000   api still unhealthy
+ 137.0s verify       RULES             91.90s $0.00000   not recovered: {'api': 'error_rate=1.0 (baseline 0.0)'}
+───────────────────────────────── iteration 2 ──────────────────────────────────
+ 137.1s detect       RULES              0.13s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+ 139.4s gather       RULES              2.23s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+ 139.4s route        RULES              0.00s $0.00000   → big: previous fix failed
+ 142.1s investigate   BIG    1563→94    2.71s $0.00407  claude-sonnet-5-5 → get_logs(cache): API fails resolving cache-v2 even after api restart, while cache shows
+ 146.0s investigate   BIG    1573→251   3.81s $0.00566  claude-sonnet-5-5 → get_health(none): The cache container is running with no logs, but the api gets 'Name or
+ 150.9s investigate   BIG    1748→462   4.82s $0.00812  claude-sonnet-5-5 → get_logs(api): Cache is healthy with no restarts or OOM, yet api error_rate stays 1.0
+ 154.7s investigate   BIG    1881→320   3.77s $0.00696  claude-sonnet-5-5 → done(none): Evidence is sufficient. The api fails 100% of requests with 'Name or s
+ 162.3s diagnose      BIG    3705→836   7.57s $0.01577  claude-sonnet-5-5 roots=[('cache_down', 'api')] conf=0.80 — api cannot resolve its configured cache host 'cache-v2' (Name or service not kno (pack ~1083 tok)
+ 162.4s plan         RULES              0.00s $0.00000   runbook cache_down.yaml exhausted → asking planner model
+ 164.5s plan          BIG    1339→112   2.13s $0.00380  claude-sonnet-5-5 proposed rollback_config(api)
+ 164.5s plan         RULES              0.00s $0.00000   model → dependency order: rollback_config(api)
+ 164.5s approve      HUMAN              0.00s $0.00000   rollback_config(api) risk=high → auto-approved (--auto-approve)
+ 165.7s act          RULES              1.09s $0.00000    restored last-known-good config (changed keys: ['REDIS_HOST']) and restarted
+ 171.2s verify-fix   RULES              5.45s $0.00000   api is healthy
+ 197.9s verify       RULES             21.70s $0.00000   recovered: 8 consecutive healthy polls over 21.5s, fault checks pass for ['cache_down@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.3, 'window_requests': 46}}
+ 198.0s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-215024.md; runbook → cache_down.learned.yaml (new, pending human review)
+                         RESOLVED  inc-20261030-215024                          
+┏━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃        ┃            ┃            ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃   MTTR ┃ iterations ┃ escalatio… ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 1.9s │ 197.8s │          2 │          1 │      15304 │ $0.04437 │   3869→116 │
+└──────┴────────┴────────────┴────────────┴────────────┴──────────┴────────────┘
+    BIG   claude-sonnet-5-5: 6 calls, 11809→2075 tok, 24.8s, $0.04437
+   SMALL  qwen3.5:4b: 1 calls, 1304→116 tok, 6.8s, $0.00000

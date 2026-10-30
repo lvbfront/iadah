@@ -1,0 +1,33 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.78}}; last-known-good 
+configs saved
+───────────────── inc-20261030-223234  scenario=6  mode=hybrid ─────────────────
+   0.7s inject       RULES              0.00s $0.00000   chaos scenario 6: HELD-OUT: wrong REDIS_HOST in api config after deploy
+   1.9s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=1.0 (baseline 0.0)'}; grouping for 3s
+   5.0s detect       RULES              0.10s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+   5.1s compress     RULES              0.08s $0.00000   ['api', 'traffic']: 158 log lines → 9 templates; ~3824 → ~116 tokens (33x smaller)
+   7.4s gather       RULES              2.33s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  15.0s triage       SMALL   1304→132   7.53s $0.00000  qwen3.5:4b invalid output (attempt 1) '{"incident_type": "cache_down", "severity": "high", "affected_services": ["api"]'
+  22.0s triage       SMALL   1475→127   7.07s $0.00000  qwen3.5:4b invalid output (attempt 2) '{"incident_type": "cache_down", "severity": "high", "affected_services": ["api"]'
+  22.0s route        RULES              0.00s $0.00000   → big: triage: small model failed twice (error or invalid output)
+  25.4s triage        BIG    2125→265   3.38s $0.00690  claude-sonnet-5-5 roots=[('unknown', 'api')] conf=0.80 sev=high
+  25.4s route        RULES              0.00s $0.00000   → big: incident type unknown
+  28.4s investigate   BIG    1209→232   2.93s $0.00474  claude-sonnet-5-5 → done(none): Evidence is sufficient: api logs show DNS failure for cache-v2:6379 on
+  33.5s diagnose      BIG    2772→589   4.98s $0.01143  claude-sonnet-5-5 roots=[('unknown', 'api')] conf=0.85 — API is misconfigured with cache host 'cache-v2', which fails DNS resolution. The (pack ~696 tok)
+  33.5s plan         RULES              0.00s $0.00000   no runbook for ['unknown'] → asking planner model
+  35.6s plan          BIG    1414→105   2.14s $0.00388  claude-sonnet-5-5 proposed rollback_config(api)
+  35.6s plan         RULES              0.00s $0.00000   model → dependency order: rollback_config(api)
+  35.6s approve      HUMAN              0.00s $0.00000   rollback_config(api) risk=high → auto-approved (--auto-approve)
+  36.2s act          RULES              0.52s $0.00000    restored last-known-good config (changed keys: ['REDIS_HOST']) and restarted
+  41.5s verify-fix   RULES              5.34s $0.00000   api is healthy
+  68.2s verify       RULES             21.55s $0.00000   recovered: 8 consecutive healthy polls over 21.4s, fault checks pass for ['unknown@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.6, 'window_requests': 46}}
+  68.2s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-223234.md; runbook → none
+                         RESOLVED  inc-20261030-223234                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 1.9s │ 68.0s │          1 │           2 │      11749 │ $0.02695 │   3824→116 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+    BIG   claude-sonnet-5-5: 4 calls, 7520→1191 tok, 13.4s, $0.02695
+   SMALL  qwen3.5:4b: 2 calls, 2779→259 tok, 14.6s, $0.00000

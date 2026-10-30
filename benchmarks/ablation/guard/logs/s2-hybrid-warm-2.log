@@ -1,0 +1,47 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.08}}; last-known-good 
+configs saved
+───────────────── inc-20261030-213918  scenario=2  mode=hybrid ─────────────────
+   0.7s inject       RULES              0.00s $0.00000   chaos scenario 2: bad DB password after deploy
+   4.0s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=1.0 (baseline 0.0)'}; grouping for 3s
+   7.1s detect       RULES              0.09s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+   7.2s compress     RULES              0.09s $0.00000   ['api', 'traffic']: 136 log lines → 10 templates; ~3265 → ~154 tokens (21x smaller)
+   9.4s gather       RULES              2.18s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  19.4s triage       SMALL   1337→140  10.02s $0.00000  qwen3.5:4b roots=[('db_auth_failure', 'db')] conf=0.95 sev=high
+  19.4s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  19.4s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['db_auth_failure'] → skip investigate/diagnose
+  19.5s plan         RULES              0.00s $0.00000   runbook:db_auth_failure → dependency order: rollback_config(db)
+  19.5s approve      HUMAN              0.00s $0.00000   rollback_config(db) risk=high → auto-approved (--auto-approve)
+  19.6s act          RULES              0.03s $0.00000   rollback_config(db) failed: no last-known-good config for db
+ 111.5s verify       RULES             91.94s $0.00000   not recovered: {'api': 'error_rate=1.0 (baseline 0.0)'}
+───────────────────────────────── iteration 2 ──────────────────────────────────
+ 111.6s detect       RULES              0.08s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+ 113.8s gather       RULES              2.20s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+ 113.8s route        RULES              0.00s $0.00000   → big: previous fix failed
+ 118.8s investigate   BIG    1600→237   5.03s $0.00557  claude-sonnet-5-5 → get_logs(db): API logs show password authentication failed for user "app", but DB-si
+ 121.9s investigate   BIG    1717→242   3.01s $0.00585  claude-sonnet-5-5 → done(none): Evidence is sufficient. DB logs show 14x 'password authentication fail
+ 131.4s diagnose      BIG    3503→1037  9.49s $0.01738  claude-sonnet-5-5 roots=[('db_auth_failure', 'db')] conf=0.90 — The db rejects password authentication for user 'app' (scram-sha-256 via pg_hba. (pack ~1010 tok)
+ 131.5s plan         RULES              0.00s $0.00000   runbook:db_auth_failure → dependency order: rollback_config(db)
+ 131.5s approve      HUMAN              0.00s $0.00000   rollback_config(db) risk=high → auto-approved (--auto-approve)
+ 131.6s act          RULES              0.03s $0.00000   rollback_config(db) failed: no last-known-good config for db
+ 223.5s verify       RULES             91.92s $0.00000   not recovered: {'api': 'error_rate=1.0 (baseline 0.0)'}
+───────────────────────────────── iteration 3 ──────────────────────────────────
+ 223.6s detect       RULES              0.11s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+ 225.8s gather       RULES              2.26s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+ 225.9s route        RULES              0.00s $0.00000   → big: previous fix failed
+ 229.7s investigate   BIG    2166→312   3.84s $0.00745  claude-sonnet-5-5 → done(none): Evidence is sufficient. DB logs show 14x password authentication faile
+ 238.6s diagnose      BIG    4101→914   8.86s $0.01734  claude-sonnet-5-5 roots=[('db_auth_failure', 'db')] conf=0.90 — The database rejects the password for user 'app' (scram-sha auth failed). The ap (pack ~1271 tok)
+ 238.6s plan         RULES              0.00s $0.00000   runbook:db_auth_failure → dependency order: rollback_config(db)
+ 238.6s approve      HUMAN              0.00s $0.00000   rollback_config(db) risk=high → auto-approved (--auto-approve)
+ 238.7s act          RULES              0.03s $0.00000   rollback_config(db) failed: no last-known-good config for db
+ 330.4s verify       RULES             91.69s $0.00000   not recovered: {'api': 'error_rate=1.0 (baseline 0.0)'}
+ 330.4s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-213918.md; runbook → none
+                       NOT RESOLVED  inc-20261030-213918                        
+┏━━━━━━┳━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━━┓
+┃      ┃      ┃            ┃             ┃            ┃          ┃  log tokens ┃
+┃ MTTD ┃ MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compre… ┃
+┡━━━━━━╇━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━━┩
+│ 4.0s │    — │          3 │           2 │      17306 │ $0.05359 │    3265→154 │
+└──────┴──────┴────────────┴─────────────┴────────────┴──────────┴─────────────┘
+    BIG   claude-sonnet-5-5: 5 calls, 13087→2742 tok, 30.2s, $0.05359
+   SMALL  qwen3.5:4b: 1 calls, 1337→140 tok, 10.0s, $0.00000

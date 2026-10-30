@@ -1,0 +1,7 @@
+scenario,mode,condition,runs,diag accuracy,model-raw diag,recovered,correct & recovered,MTTR s,actions/inc,unnecessary/inc,escalations,cost/run $,total $,MTTD s
+1,hybrid,warm,2,100%,100%,100%,100%,55.1,1.0,0.0,0.0,0.0,0.0,0.4
+2,hybrid,warm,2,100%,100%,100%,100%,71.7,1.0,0.0,1.0,0.0075,0.015,3.5
+3,hybrid,warm,2,100%,100%,100%,100%,81.5,2.0,0.0,0.0,0.0,0.0,22.0
+4,hybrid,warm,2,100%,100%,100%,100%,78.2,1.0,0.0,0.0,0.0,0.0,18.0
+5,hybrid,warm,2,100%,100%,100%,100%,73.6,2.0,0.0,1.0,0.0229,0.046,7.4
+6,hybrid,warm,2,100%,100%,100%,100%,71.8,1.0,0.0,2.0,0.0331,0.066,1.9

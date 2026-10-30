@@ -1,0 +1,25 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.48}}; last-known-good 
+configs saved
+───────────────── inc-20261030-224454  scenario=1  mode=hybrid ─────────────────
+   0.4s inject       RULES              0.00s $0.00000   chaos scenario 1: redis down
+   0.5s detect       RULES              0.00s $0.00000   first alert {'cache': 'status=down'}; grouping for 3s
+   3.5s detect       RULES              0.09s $0.00000   unhealthy={'cache': 'status=down', 'api': 'error_rate=0.326 (baseline 0.0)'} → root suspects=['cache'] symptoms=['api']
+   3.7s compress     RULES              0.15s $0.00000   ['api', 'cache', 'traffic', 'worker']: 145 log lines → 10 templates; ~3524 → ~191 tokens (18x smaller)
+   4.8s gather       RULES              1.12s $0.00000   2 parallel metric reads ['api', 'cache'] in code
+  13.3s triage       SMALL   1322→129   8.51s $0.00000  qwen3.5:4b roots=[('cache_down', 'cache')] conf=0.95 sev=high
+  13.3s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  13.3s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['cache_down'] → skip investigate/diagnose
+  13.4s plan         RULES              0.00s $0.00000   runbook:cache_down → dependency order: restart(cache)
+  13.7s act          RULES              0.14s $0.00000    restarted cache (1 replica(s))
+  19.0s verify-fix   RULES              5.34s $0.00000   cache is healthy
+  24.2s verify       RULES              0.15s $0.00000   recovered: 1 consecutive healthy polls over 0.0s, fault checks pass for ['cache_down@cache']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.2, 'window_requests': 46}}
+  24.2s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-224454.md; runbook → cache_down.yaml (times_used=1)
+                         RESOLVED  inc-20261030-224454                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 0.5s │ 24.1s │          1 │           0 │       1451 │ $0.00000 │   3524→191 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 1 calls, 1322→129 tok, 8.5s, $0.00000

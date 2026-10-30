@@ -1,0 +1,417 @@
+36 runs to do (0 already done)
+[1/36] s7-hybrid-cold-1: resolved=0 diag=0 (none) mttr= $0 116s 
+[2/36] s7-hybrid-warm-1: resolved=0 diag=0 (none) mttr= $0 115s 
+[3/36] s7-big-only-cold-1: resolved=0 diag=0 (none) mttr= $0 115s 
+[4/36] s7-big-only-warm-1: resolved=0 diag=0 (none) mttr= $0 115s 
+[5/36] s7-small-only-cold-1: resolved=0 diag=0 (none) mttr= $0 115s 
+[6/36] s7-small-only-warm-1: resolved=0 diag=0 (none) mttr= $0 116s 
+[7/36] s8-hybrid-cold-1: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.02127 269s 
+[8/36] s8-hybrid-warm-1: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.01881 260s 
+[9/36] s8-big-only-cold-1: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.04943 274s 
+[10/36] s8-big-only-warm-1: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.06036 278s 
+[11/36] s8-small-only-cold-1: resolved=0 diag=0 (none) mttr= $0.0 86s 
+[12/36] s8-small-only-warm-1: resolved=0 diag=0 (none) mttr= $0.0 80s 
+[13/36] s7-hybrid-cold-2: resolved=0 diag=0 (none) mttr= $0 117s 
+[14/36] s7-hybrid-warm-2: resolved=0 diag=0 (none) mttr= $0 116s 
+[15/36] s7-big-only-cold-2: resolved=0 diag=0 (none) mttr= $0 115s 
+[16/36] s7-big-only-warm-2: resolved=0 diag=0 (none) mttr= $0 115s 
+[17/36] s7-small-only-cold-2: resolved=0 diag=0 (none) mttr= $0 115s 
+[18/36] s7-small-only-warm-2: resolved=0 diag=0 (none) mttr= $0 115s 
+[19/36] s8-hybrid-cold-2: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.01921 263s 
+[20/36] s8-hybrid-warm-2: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.02168 264s 
+[21/36] s8-big-only-cold-2: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.0619 285s 
+[22/36] s8-big-only-warm-2: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.05827 289s 
+[23/36] s8-small-only-cold-2: resolved=0 diag=0 (none) mttr= $0.0 84s 
+[24/36] s8-small-only-warm-2: resolved=0 diag=0 (none) mttr= $0.0 80s 
+[25/36] s7-hybrid-cold-3: resolved=0 diag=0 (none) mttr= $0 117s 
+[26/36] s7-hybrid-warm-3: resolved=0 diag=0 (none) mttr= $0 116s 
+[27/36] s7-big-only-cold-3: resolved=0 diag=0 (none) mttr= $0 117s 
+[28/36] s7-big-only-warm-3: resolved=0 diag=0 (none) mttr= $0 115s 
+[29/36] s7-small-only-cold-3: resolved=0 diag=0 (none) mttr= $0 115s 
+[30/36] s7-small-only-warm-3: resolved=0 diag=0 (none) mttr= $0 116s 
+[31/36] s8-hybrid-cold-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.01868 260s 
+[32/36] s8-hybrid-warm-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.05354 285s 
+  s8-big-only-cold-3: machine slept 1279.1s mid-run → invalid, rerunning (1/3)
+  s8-big-only-cold-3: machine slept 3024.8s mid-run → invalid, rerunning (2/3)
+  s8-big-only-cold-3: machine slept 3883.3s mid-run → invalid, rerunning (3/3)
+[33/36] s8-big-only-cold-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.05055 9076s 
+  s8-big-only-warm-3: machine slept 1834.2s mid-run → invalid, rerunning (1/3)
+  s8-big-only-warm-3: machine slept 3038.9s mid-run → invalid, rerunning (2/3)
+  s8-big-only-warm-3: machine slept 2015.3s mid-run → invalid, rerunning (3/3)
+[34/36] s8-big-only-warm-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.0554 7983s 
+[35/36] s8-small-only-cold-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.0 275s 
+[36/36] s8-small-only-warm-3: resolved=0 diag=0 (none) mttr= $0.0 78s 
+# Benchmark results
+
+34 valid runs (6 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | cold | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.67 | 0.0099 | 0.059 |
+| hybrid | warm | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.67 | 0.0157 | 0.094 |
+| big-only | cold | 5 | 0% | 0% | 0% | 0% |  | 0.4 | 0.4 | 0.0 | 0.0223 | 0.111 |
+| big-only | warm | 5 | 0% | 0% | 0% | 0% |  | 0.4 | 0.4 | 0.0 | 0.0237 | 0.119 |
+| small-only | cold | 6 | 0% | 0% | 0% | 0% |  | 0.33 | 0.33 | 0.0 | 0.0 | 0.0 |
+| small-only | warm | 6 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | hybrid | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | hybrid | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | big-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | big-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 8 | hybrid | cold | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 1.33 | 0.0197 | 0.059 | 3.4 |
+| 8 | hybrid | warm | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 1.33 | 0.0313 | 0.094 | 3.7 |
+| 8 | big-only | cold | 2 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 0.0 | 0.0557 | 0.111 | 3.4 |
+| 8 | big-only | warm | 2 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 0.0 | 0.0593 | 0.119 | 3.4 |
+| 8 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.67 | 0.67 | 0.0 | 0.0 | 0.0 | 3.4 |
+| 8 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.5 |
+
+## Where small-only fails (not correct & recovered)
+
+| run | diagnosed | truth | resolved | actions | error |
+|---|---|---|---|---|---|
+| s7-small-only-cold-1 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-1 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-1 | none | *@db | 0 |  |  |
+| s8-small-only-warm-1 | none | *@db | 0 |  |  |
+| s7-small-only-cold-2 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-2 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-2 | none | *@db | 0 |  |  |
+| s8-small-only-warm-2 | none | *@db | 0 |  |  |
+| s7-small-only-cold-3 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-3 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-3 | db_pool_exhaustion@api | *@db | 0 | scale(db);restart(api) |  |
+| s8-small-only-warm-3 | none | *@db | 0 |  |  |
+
+## Invariant violations: 0
+
+## Errors: 0
+=== ablation: full ===
+12 runs to do (0 already done)
+[1/12] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=44.9 $0.0 81s 
+[2/12] s2-hybrid-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=61.7 $0.00749 97s 
+[3/12] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=66.0 $0.0 101s 
+[4/12] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=62.4 $0.0 97s 
+[5/12] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=82.4 $0.02332 117s 
+[6/12] s6-hybrid-warm-1: resolved=1 diag=1 (cache_down@api) mttr=199.4 $0.0449 235s 
+[7/12] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=44.8 $0.0 80s 
+[8/12] s2-hybrid-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=61.4 $0.00746 97s 
+[9/12] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=67.3 $0.0 103s 
+[10/12] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=63.1 $0.0 99s 
+[11/12] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=78.2 $0.02392 113s 
+[12/12] s6-hybrid-warm-2: resolved=1 diag=1 (unknown@api) mttr=74.8 $0.03201 110s 
+# Benchmark results
+
+12 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | warm | 12 | 100% | 83% | 100% | 100% | 75.5 | 1.42 | 0.08 | 0.58 | 0.0116 | 0.139 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | warm | 2 | 100% | 0% | 100% | 100% | 44.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 2 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 61.5 | 1.0 | 0.0 | 1.0 | 0.0075 | 0.015 | 4.0 |
+| 3 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 66.7 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.9 |
+| 4 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 62.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.6 |
+| 5 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 80.3 | 2.0 | 0.0 | 1.0 | 0.0236 | 0.047 | 7.0 |
+| 6 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 137.1 | 1.5 | 0.5 | 1.5 | 0.0385 | 0.077 | 1.9 |
+
+## Where small-only fails (not correct & recovered)
+
+None.
+
+## Invariant violations: 0
+
+## Errors: 0
+=== ablation: guard ===
+12 runs to do (0 already done)
+[1/12] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=58.3 $0.01424 95s 
+[2/12] s2-hybrid-warm-1: resolved=0 diag=0 (db_auth_failure@db) mttr= $0.05476 352s 
+[3/12] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=69.2 $0.0 105s 
+[4/12] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=64.1 $0.0 100s 
+[5/12] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=82.9 $0.02317 119s 
+[6/12] s6-hybrid-warm-1: resolved=1 diag=1 (unknown@api) mttr=198.2 $0.05669 244s 
+[7/12] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=257.5 $0.05643 406s 
+[8/12] s2-hybrid-warm-2: resolved=0 diag=0 (db_auth_failure@db) mttr= $0.05359 356s 
+[9/12] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=68.4 $0.0 103s 
+[10/12] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=63.4 $0.0 99s 
+[11/12] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=73.6 $0.02443 108s 
+[12/12] s6-hybrid-warm-2: resolved=1 diag=1 (cache_down@api) mttr=197.8 $0.04437 233s 
+# Benchmark results
+
+12 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | warm | 12 | 83% | 83% | 83% | 75% | 113.3 | 1.42 | 0.25 | 0.92 | 0.0273 | 0.328 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 157.9 | 1.5 | 0.5 | 1.5 | 0.0353 | 0.071 | 0.6 |
+| 2 | hybrid | warm | 2 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 2.0 | 0.0542 | 0.108 | 3.5 |
+| 3 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 68.8 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.7 |
+| 4 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 63.8 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.6 |
+| 5 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 78.2 | 2.0 | 0.0 | 1.0 | 0.0238 | 0.048 | 8.1 |
+| 6 | hybrid | warm | 2 | 100% | 100% | 100% | 50% | 198.0 | 2.0 | 1.0 | 1.0 | 0.0505 | 0.101 | 2.3 |
+
+## Where small-only fails (not correct & recovered)
+
+None.
+
+## Invariant violations: 0
+
+## Errors: 0
+=== ablation: compress ===
+12 runs to do (0 already done)
+[1/12] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=87.9 $0.0 125s 
+[2/12] s2-hybrid-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=95.0 $0.0 131s 
+[3/12] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=94.3 $0.0 135s 
+[4/12] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=128.4 $0.0 163s 
+[5/12] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=99.5 $0.0404 134s 
+[6/12] s6-hybrid-warm-1: resolved=1 diag=1 (cache_down@api) mttr=209.3 $0.04952 244s 
+[7/12] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=63.0 $0.0 98s 
+[8/12] s2-hybrid-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=63.8 $0.0 99s 
+[9/12] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=66.0 $0.0 101s 
+[10/12] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=97.6 $0.0 133s 
+[11/12] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=93.1 $0.03616 128s 
+[12/12] s6-hybrid-warm-2: resolved=1 diag=1 (cache_down@api) mttr=216.1 $0.05289 251s 
+# Benchmark results
+
+12 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | warm | 12 | 100% | 83% | 100% | 100% | 109.5 | 1.5 | 0.17 | 0.33 | 0.0149 | 0.179 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | warm | 2 | 100% | 0% | 100% | 100% | 75.5 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 2 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 79.4 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 4.2 |
+| 3 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 80.2 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 23.8 |
+| 4 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 113.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 17.6 |
+| 5 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 96.3 | 2.0 | 0.0 | 1.0 | 0.0383 | 0.077 | 7.1 |
+| 6 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 212.7 | 2.0 | 1.0 | 1.0 | 0.0512 | 0.102 | 1.9 |
+
+## Where small-only fails (not correct & recovered)
+
+None.
+
+## Invariant violations: 0
+
+## Errors: 0
+=== ablation: fastpath ===
+12 runs to do (0 already done)
+[1/12] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=55.7 $0.0 91s 
+[2/12] s2-hybrid-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=70.5 $0.0076 106s 
+[3/12] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=86.7 $0.0 122s 
+[4/12] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=84.0 $0.0 123s 
+[5/12] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=73.9 $0.02382 109s 
+[6/12] s6-hybrid-warm-1: resolved=1 diag=1 (unknown@api) mttr=68.0 $0.02695 103s 
+[7/12] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=54.5 $0.0 89s 
+[8/12] s2-hybrid-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=72.9 $0.00735 108s 
+[9/12] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=76.3 $0.0 111s 
+[10/12] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=72.3 $0.0 107s 
+[11/12] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=73.2 $0.02195 108s 
+[12/12] s6-hybrid-warm-2: resolved=1 diag=1 (unknown@api) mttr=75.7 $0.03917 111s 
+# Benchmark results
+
+12 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | warm | 12 | 100% | 100% | 100% | 100% | 72.0 | 1.33 | 0.0 | 0.67 | 0.0106 | 0.127 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 55.1 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.4 |
+| 2 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 71.7 | 1.0 | 0.0 | 1.0 | 0.0075 | 0.015 | 3.5 |
+| 3 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 81.5 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 22.0 |
+| 4 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 78.2 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 18.0 |
+| 5 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 73.6 | 2.0 | 0.0 | 1.0 | 0.0229 | 0.046 | 7.4 |
+| 6 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 71.8 | 1.0 | 0.0 | 2.0 | 0.0331 | 0.066 | 1.9 |
+
+## Where small-only fails (not correct & recovered)
+
+None.
+
+## Invariant violations: 0
+
+## Errors: 0
+=== ablation: verify ===
+12 runs to do (0 already done)
+[1/12] s1-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache) mttr=24.1 $0.0 59s 
+[2/12] s2-hybrid-warm-1: resolved=1 diag=1 (db_auth_failure@api) mttr=38.1 $0.00751 73s 
+[3/12] s3-hybrid-warm-1: resolved=1 diag=1 (memory_leak@worker) mttr=43.7 $0.0 78s 
+[4/12] s4-hybrid-warm-1: resolved=1 diag=1 (disk_full@api) mttr=44.1 $0.0 79s 
+[5/12] s5-hybrid-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=47.5 $0.02272 82s 
+[6/12] s6-hybrid-warm-1: resolved=1 diag=1 (unknown@api) mttr=51.4 $0.0322 86s 
+[7/12] s1-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache) mttr=22.9 $0.0 58s 
+[8/12] s2-hybrid-warm-2: resolved=1 diag=1 (db_auth_failure@api) mttr=40.0 $0.00718 75s 
+[9/12] s3-hybrid-warm-2: resolved=1 diag=1 (memory_leak@worker) mttr=44.0 $0.0 79s 
+[10/12] s4-hybrid-warm-2: resolved=1 diag=1 (disk_full@api) mttr=42.2 $0.0 77s 
+[11/12] s5-hybrid-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=53.6 $0.02171 89s 
+[12/12] s6-hybrid-warm-2: resolved=1 diag=1 (unknown@api) mttr=51.1 $0.02994 86s 
+# Benchmark results
+
+12 valid runs (0 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | warm | 12 | 100% | 92% | 100% | 100% | 41.9 | 1.33 | 0.0 | 0.67 | 0.0101 | 0.121 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | hybrid | warm | 2 | 100% | 50% | 100% | 100% | 23.5 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.5 |
+| 2 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 39.0 | 1.0 | 0.0 | 1.0 | 0.0073 | 0.015 | 4.2 |
+| 3 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 43.9 | 2.0 | 0.0 | 0.0 | 0.0 | 0.0 | 21.9 |
+| 4 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 43.2 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 18.1 |
+| 5 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 50.5 | 2.0 | 0.0 | 1.0 | 0.0222 | 0.044 | 7.0 |
+| 6 | hybrid | warm | 2 | 100% | 100% | 100% | 100% | 51.2 | 1.0 | 0.0 | 2.0 | 0.0311 | 0.062 | 2.0 |
+
+## Where small-only fails (not correct & recovered)
+
+None.
+
+## Invariant violations: 0
+
+## Errors: 0
+# Ablation: hybrid, warm (seed runbooks), scenarios 1–6, n=2
+
+One component switched off at a time (`benchmarks/run.py --ablate`). **false recoveries** = the agent declared recovery but the system was not healthy 10s later.
+
+| config | runs | correct & recovered | recovered | false recoveries | MTTR s | tokens / run | cost / run $ | escalations | unnecessary / inc | errors |
+|---|---|---|---|---|---|---|---|---|---|---|
+| full hybrid | 12 | 100% | 100% | 0 | 75.5 | 5194 | 0.0116 | 0.58 | 0.08 | 0 |
+| (a) no topology guard | 12 | 75% | 83% | 1 | 113.3 | 9566 | 0.0273 | 0.92 | 0.25 | 0 |
+| (b) no log compression | 12 | 100% | 100% | 0 | 109.5 | 12611 | 0.0149 | 0.33 | 0.17 | 0 |
+| (c) no fast path | 12 | 100% | 100% | 0 | 72.0 | 6199 | 0.0106 | 0.67 | 0.0 | 0 |
+| (d) single-poll verify | 12 | 100% | 100% | 0 | 41.9 | 4874 | 0.0101 | 0.67 | 0.0 | 0 |
+
+## Correct & recovered by scenario
+
+| config | s1 | s2 | s3 | s4 | s5 | s6 |
+|---|---|---|---|---|---|---|
+| full hybrid | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| (a) no topology guard | 2/2 | 0/2 | 2/2 | 2/2 | 2/2 | 1/2 |
+| (b) no log compression | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| (c) no fast path | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+| (d) single-poll verify | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 | 2/2 |
+
+2 runs to do (34 already done)
+[1/2] s8-big-only-cold-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.02131 250s 
+[2/2] s8-big-only-warm-3: resolved=0 diag=0 (db_pool_exhaustion@api) mttr= $0.04878 268s 
+# Benchmark results
+
+36 valid runs (6 discarded: machine slept > 60s mid-run, rerun). Ground truth = `chaos.TRUTH` (scenario 6 is held out, graded on root service). **diag accuracy** grades the agent's final roots (model output minus topology symptoms); **model-raw diag** grades the model's root_causes before any rule filtering. MTTR averages resolved runs only. **correct & recovered** = right diagnosis AND verified recovery AND still healthy 10s later. **unnecessary** = an action on a service that is not a true root, or a repeated action. cold = no runbooks, warm = seed runbooks (none for scenarios 5 and 6).
+
+## Fault scenarios 1–6, by mode × condition
+
+| mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| hybrid | cold | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.67 | 0.0099 | 0.059 |
+| hybrid | warm | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.67 | 0.0157 | 0.094 |
+| big-only | cold | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.0 | 0.0221 | 0.133 |
+| big-only | warm | 6 | 0% | 0% | 0% | 0% |  | 0.5 | 0.5 | 0.0 | 0.0279 | 0.167 |
+| small-only | cold | 6 | 0% | 0% | 0% | 0% |  | 0.33 | 0.33 | 0.0 | 0.0 | 0.0 |
+| small-only | warm | 6 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+
+## Scenario 0: no-fault control
+
+| mode | runs | false detections | actions taken |
+|---|---|---|---|
+
+## By scenario
+
+| scenario | mode | condition | runs | diag accuracy | model-raw diag | recovered | correct & recovered | MTTR s | actions/inc | unnecessary/inc | escalations | cost/run $ | total $ | MTTD s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 7 | hybrid | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | hybrid | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | big-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | big-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 7 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  |
+| 8 | hybrid | cold | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 1.33 | 0.0197 | 0.059 | 3.4 |
+| 8 | hybrid | warm | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 1.33 | 0.0313 | 0.094 | 3.7 |
+| 8 | big-only | cold | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 0.0 | 0.0442 | 0.133 | 3.4 |
+| 8 | big-only | warm | 3 | 0% | 0% | 0% | 0% |  | 1.0 | 1.0 | 0.0 | 0.0558 | 0.167 | 3.4 |
+| 8 | small-only | cold | 3 | 0% | 0% | 0% | 0% |  | 0.67 | 0.67 | 0.0 | 0.0 | 0.0 | 3.4 |
+| 8 | small-only | warm | 3 | 0% | 0% | 0% | 0% |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 3.5 |
+
+## Where small-only fails (not correct & recovered)
+
+| run | diagnosed | truth | resolved | actions | error |
+|---|---|---|---|---|---|
+| s7-small-only-cold-1 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-1 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-1 | none | *@db | 0 |  |  |
+| s8-small-only-warm-1 | none | *@db | 0 |  |  |
+| s7-small-only-cold-2 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-2 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-2 | none | *@db | 0 |  |  |
+| s8-small-only-warm-2 | none | *@db | 0 |  |  |
+| s7-small-only-cold-3 | none | *@worker | 0 |  |  |
+| s7-small-only-warm-3 | none | *@worker | 0 |  |  |
+| s8-small-only-cold-3 | db_pool_exhaustion@api | *@db | 0 | scale(db);restart(api) |  |
+| s8-small-only-warm-3 | none | *@db | 0 |  |  |
+
+## Invariant violations: 0
+
+## Errors: 0

@@ -131,3 +131,6 @@ scripts/eval.sh [quick|full]                                 # fail-safe + smoke
 - [x] Overnight hardening: strict verify, hint removal, held-out scenario 6, control scenario 0, new metrics, safety (per-service risk, rolling restart, auto-undo, caps, runbook review), fresh-review audit fixes, fail-safe tests 5/5, invariants
 - [x] v2 benchmark (126 runs, post-audit) → `benchmarks/results.md`: hybrid 100% correct & recovered, 0 invariant violations, 0 false detections on the control
 - [x] Dashboard: live topology/timeline/counters, web approval, runbook review + learning demo (hide/restore seed), replay, benchmark tab. Tested from the page: s1 ($0, fast path), s5 with web approval, learning demo ($0.0146 → $0).
+- [x] Held-out 7–8 (independent agent): 0/36 correct & recovered. s7 never detected (no worker health signal); s8 detected, misdiagnosed as `db_pool_exhaustion@api`, handed to a human in 18/18. → `benchmarks/heldout/`
+- [x] Ablation (hybrid warm, s1–6, n=2): guard 100→75% correct & recovered, 2.4× cost; compression saves 2.4× tokens; fast path and single-poll verify showed no measurable difference → `benchmarks/ablation/results.md`
+- [x] `scripts/eval.sh` + `benchmarks.compare regress` (passes the full agent, flags the guard ablation)

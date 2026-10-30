@@ -1,0 +1,26 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.14}}; last-known-good 
+configs saved
+───────────────── inc-20261030-221130  scenario=2  mode=hybrid ─────────────────
+   0.8s inject       RULES              0.00s $0.00000   chaos scenario 2: bad DB password after deploy
+   3.0s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=1.0 (baseline 0.0)'}; grouping for 3s
+   6.1s detect       RULES              0.08s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+   6.1s compress     RULES              0.07s $0.00000   ['api', 'traffic']: 139 log lines → 139 templates; ~3331 → ~2254 tokens (1x smaller)
+   8.3s gather       RULES              2.15s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  30.6s triage       SMALL   6405→126  22.23s $0.00000  qwen3.5:4b roots=[('db_auth_failure', 'api')] conf=0.95 sev=high
+  30.6s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  30.6s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['db_auth_failure'] → skip investigate/diagnose
+  30.6s plan         RULES              0.00s $0.00000   runbook:db_auth_failure → dependency order: rollback_config(api)
+  30.6s approve      HUMAN              0.00s $0.00000   rollback_config(api) risk=high → auto-approved (--auto-approve)
+  32.1s act          RULES              1.45s $0.00000    restored last-known-good config (changed keys: ['DB_PASSWORD']) and restarted
+  37.4s verify-fix   RULES              5.30s $0.00000   api is healthy
+  64.0s verify       RULES             21.50s $0.00000   recovered: 8 consecutive healthy polls over 21.4s, fault checks pass for ['db_auth_failure@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.3, 'window_requests': 45}}
+  64.0s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-221130.md; runbook → db_auth_failure.yaml (times_used=1)
+                         RESOLVED  inc-20261030-221130                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 3.0s │ 63.8s │          1 │           0 │       6531 │ $0.00000 │  3331→2254 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 1 calls, 6405→126 tok, 22.2s, $0.00000

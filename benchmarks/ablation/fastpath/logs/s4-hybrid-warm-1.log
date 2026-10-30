@@ -1,0 +1,27 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 11.2}}; last-known-good 
+configs saved
+───────────────── inc-20261030-222843  scenario=4  mode=hybrid ─────────────────
+   0.2s inject       RULES              0.00s $0.00000   chaos scenario 4: disk fill on api scratch volume
+  18.5s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=0.267 (baseline 0.0)'}; grouping for 3s
+  21.6s detect       RULES              0.05s $0.00000   unhealthy={'api': 'error_rate=0.578 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+  21.6s compress     RULES              0.06s $0.00000   ['api', 'traffic']: 277 log lines → 3 templates; ~6634 → ~51 tokens (130x smaller)
+  23.8s gather       RULES              2.13s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  33.9s triage       SMALL   1237→116  10.07s $0.00000  qwen3.5:4b roots=[('disk_full', 'api')] conf=0.95 sev=critical
+  33.9s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  33.9s investigate  RULES              0.00s $0.00000   skipped: not ambiguous (conf 0.95), code-gathered evidence suffices
+  50.2s diagnose     SMALL   1488→173  16.29s $0.00000  qwen3.5:4b roots=[('disk_full', 'api')] conf=0.95 — Disk space exhaustion causing write failures and service unavailability (pack ~563 tok)
+  50.2s plan         RULES              0.00s $0.00000   runbook:disk_full → dependency order: clear_disk(api)
+  50.2s approve      HUMAN              0.00s $0.00000   clear_disk(api) risk=high → auto-approved (--auto-approve)
+  50.3s act          RULES              0.08s $0.00000    freed 15 MB under /data/tmp on api
+  50.4s verify-fix   RULES              0.04s $0.00000   api is healthy
+  84.1s verify       RULES             28.65s $0.00000   recovered: 6 consecutive healthy polls over 21.3s, fault checks pass for ['disk_full@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 10.2, 'window_requests': 44}}
+  84.1s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-222843.md; runbook → disk_full.yaml (times_used=1)
+                         RESOLVED  inc-20261030-222843                          
+┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃       ┃       ┃            ┃            ┃            ┃          ┃ log tokens ┃
+┃  MTTD ┃  MTTR ┃ iterations ┃ escalatio… ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 18.5s │ 84.0s │          1 │          0 │       3014 │ $0.00000 │    6634→51 │
+└───────┴───────┴────────────┴────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 2 calls, 2725→289 tok, 26.4s, $0.00000

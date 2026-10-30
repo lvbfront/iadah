@@ -1,0 +1,26 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.82}}; last-known-good 
+configs saved
+───────────────── inc-20261030-225231  scenario=1  mode=hybrid ─────────────────
+   0.3s inject       RULES              0.00s $0.00000   chaos scenario 1: redis down
+   0.4s detect       RULES              0.00s $0.00000   first alert {'cache': 'status=down'}; grouping for 3s
+   3.5s detect       RULES              0.09s $0.00000   unhealthy={'cache': 'status=down', 'api': 'error_rate=0.25 (baseline 0.0)'} → root suspects=['cache'] symptoms=['api']
+   3.6s compress     RULES              0.12s $0.00000   ['api', 'cache', 'traffic', 'worker']: 140 log lines → 11 templates; ~3322 → ~205 tokens (16x smaller)
+   4.7s gather       RULES              1.13s $0.00000   2 parallel metric reads ['api', 'cache'] in code
+  12.3s triage       SMALL   1333→143   7.55s $0.00000  qwen3.5:4b roots=[('cache_down', 'cache'), ('slow_queries', 'api')] conf=0.95 sev=high
+  12.3s route        RULES              0.00s $0.00000   dropped symptom roots on ['api'] (topology)
+  12.3s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  12.3s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['cache_down'] → skip investigate/diagnose
+  12.4s plan         RULES              0.00s $0.00000   runbook:cache_down → dependency order: restart(cache)
+  12.5s act          RULES              0.12s $0.00000    restarted cache (1 replica(s))
+  17.8s verify-fix   RULES              5.33s $0.00000   cache is healthy
+  23.0s verify       RULES              0.13s $0.00000   recovered: 1 consecutive healthy polls over 0.0s, fault checks pass for ['cache_down@cache']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.4, 'window_requests': 46}}
+  23.0s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-225231.md; runbook → cache_down.yaml (times_used=1)
+                         RESOLVED  inc-20261030-225231                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 0.4s │ 22.9s │          1 │           0 │       1476 │ $0.00000 │   3322→205 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 1 calls, 1333→143 tok, 7.6s, $0.00000

@@ -1,0 +1,26 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.04}}; last-known-good 
+configs saved
+───────────────── inc-20261030-221450  scenario=4  mode=hybrid ─────────────────
+   0.2s inject       RULES              0.00s $0.00000   chaos scenario 4: disk fill on api scratch volume
+  17.5s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=0.267 (baseline 0.0)'}; grouping for 3s
+  20.6s detect       RULES              0.07s $0.00000   unhealthy={'api': 'error_rate=0.578 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+  20.7s compress     RULES              0.12s $0.00000   ['api', 'traffic']: 281 log lines → 281 templates; ~6727 → ~4549 tokens (1x smaller)
+  23.0s gather       RULES              2.24s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  64.3s triage       SMALL  12045→142  41.32s $0.00000  qwen3.5:4b roots=[('disk_full', 'api')] conf=0.95 sev=critical
+  64.3s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.95
+  64.3s fast-path    RULES              0.00s $0.00000   fast path: conf 0.95 ≥ 0.85 + runbook for ['disk_full'] → skip investigate/diagnose
+  64.4s plan         RULES              0.00s $0.00000   runbook:disk_full → dependency order: clear_disk(api)
+  64.4s approve      HUMAN              0.00s $0.00000   clear_disk(api) risk=high → auto-approved (--auto-approve)
+  64.5s act          RULES              0.07s $0.00000    freed 15 MB under /data/tmp on api
+  64.5s verify-fix   RULES              0.03s $0.00000   api is healthy
+  97.7s verify       RULES             28.17s $0.00000   recovered: 6 consecutive healthy polls over 20.8s, fault checks pass for ['disk_full@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.2, 'window_requests': 46}}
+  97.8s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-221450.md; runbook → disk_full.yaml (times_used=1)
+                         RESOLVED  inc-20261030-221450                          
+┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃       ┃       ┃            ┃            ┃            ┃          ┃ log tokens ┃
+┃  MTTD ┃  MTTR ┃ iterations ┃ escalatio… ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 17.5s │ 97.6s │          1 │          0 │      12187 │ $0.00000 │  6727→4549 │
+└───────┴───────┴────────────┴────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 1 calls, 12045→142 tok, 41.3s, $0.00000

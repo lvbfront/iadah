@@ -1,0 +1,31 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.22}}; last-known-good 
+configs saved
+───────────────── inc-20261030-222455  scenario=2  mode=hybrid ─────────────────
+   0.8s inject       RULES              0.00s $0.00000   chaos scenario 2: bad DB password after deploy
+   3.0s detect       RULES              0.00s $0.00000   first alert {'api': 'error_rate=1.0 (baseline 0.0)'}; grouping for 3s
+   6.1s detect       RULES              0.10s $0.00000   unhealthy={'api': 'error_rate=1.0 (baseline 0.0)'} → root suspects=['api'] symptoms=[]
+   6.2s compress     RULES              0.06s $0.00000   ['api', 'traffic']: 137 log lines → 10 templates; ~3286 → ~154 tokens (21x smaller)
+   8.3s gather       RULES              2.15s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  16.0s triage       SMALL   1337→127   7.71s $0.00000  qwen3.5:4b invalid output (attempt 1) '{"incident_type": "db_auth_failure", "severity": "high", "affected_services": ["'
+  22.3s triage       SMALL   1505→102   6.21s $0.00000  qwen3.5:4b invalid output (attempt 2) '{"incident_type": "db_auth_failure", "severity": "high", "affected_services": ["'
+  22.3s route        RULES              0.00s $0.00000   → big: triage: small model failed twice (error or invalid output)
+  26.0s triage        BIG    2186→323   3.69s $0.00760  claude-sonnet-5-5 roots=[('db_auth_failure', 'api')] conf=0.93 sev=high
+  26.0s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.93
+  26.0s investigate  RULES              0.00s $0.00000   skipped: not ambiguous (conf 0.93), code-gathered evidence suffices
+  37.9s diagnose     SMALL   1701→240  11.80s $0.00000  qwen3.5:4b roots=[('db_auth_failure', 'api')] conf=0.95 — API service credentials for user 'app' are invalid or expired, causing authentic (pack ~769 tok)
+  37.9s plan         RULES              0.00s $0.00000   runbook:db_auth_failure → dependency order: rollback_config(api)
+  37.9s approve      HUMAN              0.00s $0.00000   rollback_config(api) risk=high → auto-approved (--auto-approve)
+  38.8s act          RULES              0.84s $0.00000    restored last-known-good config (changed keys: ['DB_PASSWORD']) and restarted
+  44.1s verify-fix   RULES              5.29s $0.00000   api is healthy
+  70.7s verify       RULES             21.55s $0.00000   recovered: 8 consecutive healthy polls over 21.4s, fault checks pass for ['db_auth_failure@api']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.6, 'window_requests': 46}}
+  70.7s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-222455.md; runbook → db_auth_failure.yaml (times_used=1)
+                         RESOLVED  inc-20261030-222455                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 3.0s │ 70.5s │          1 │           1 │       7521 │ $0.00760 │   3286→154 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+    BIG   claude-sonnet-5-5: 1 calls, 2186→323 tok, 3.7s, $0.00760
+   SMALL  qwen3.5:4b: 3 calls, 4543→469 tok, 25.7s, $0.00000

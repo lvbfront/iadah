@@ -1,0 +1,28 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.44}}; last-known-good 
+configs saved
+───────────────── inc-20261030-223734  scenario=3  mode=hybrid ─────────────────
+   0.1s inject       RULES              0.00s $0.00000   chaos scenario 3: worker memory leak
+  21.8s detect       RULES              0.00s $0.00000   first alert {'worker': 'memory=76.2% of limit'}; grouping for 3s
+  24.8s detect       RULES              0.07s $0.00000   unhealthy={'worker': 'memory=85.6% of limit'} → root suspects=['worker'] symptoms=[]
+  24.9s compress     RULES              0.05s $0.00000   ['worker']: 2 log lines → 1 templates; ~42 → ~10 tokens (4x smaller)
+  27.0s gather       RULES              2.12s $0.00000   3 parallel metric reads ['cache', 'db', 'worker'] in code
+  33.0s triage       SMALL   1046→110   5.97s $0.00000  qwen3.5:4b roots=[('memory_leak', 'worker')] conf=0.90 sev=medium
+  33.0s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.90
+  33.0s investigate  RULES              0.00s $0.00000   skipped: not ambiguous (conf 0.90), code-gathered evidence suffices
+  43.6s diagnose     SMALL   1285→248  10.47s $0.00000  qwen3.5:4b roots=[('memory_leak', 'worker')] conf=0.95 — Worker memory usage at 85.6% of limit with no restarts or OOM events, indicating (pack ~429 tok)
+  43.6s plan         RULES              0.00s $0.00000   runbook:memory_leak → dependency order: restart(worker) → scale(worker)
+  44.2s act          RULES              0.54s $0.00000    restarted worker (1 replica(s))
+  44.2s verify-fix   RULES              0.05s $0.00000   worker is running
+  49.8s act          RULES              0.40s $0.00000    scaled worker 1 → 2 replicas
+  49.8s verify-fix   RULES              0.04s $0.00000   worker is running
+  76.5s verify       RULES             21.62s $0.00000   recovered: 8 consecutive healthy polls over 21.5s, fault checks pass for ['memory_leak@worker']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.6, 'window_requests': 45}}
+  76.5s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-223734.md; runbook → memory_leak.yaml (times_used=1)
+                         RESOLVED  inc-20261030-223734                          
+┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃       ┃       ┃            ┃            ┃            ┃          ┃ log tokens ┃
+┃  MTTD ┃  MTTR ┃ iterations ┃ escalatio… ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 21.8s │ 76.3s │          1 │          0 │       2689 │ $0.00000 │      42→10 │
+└───────┴───────┴────────────┴────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 2 calls, 2331→358 tok, 16.4s, $0.00000

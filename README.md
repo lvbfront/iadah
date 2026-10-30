@@ -1,6 +1,6 @@
 # إعادة | I'adah — Agentic Recovery, Efficient by Design
 
-I'adah is an AI agent that **detects, diagnoses, fixes and verifies recovery** of a failing system, including two faults at the same time. A **small local model** (Ollama `qwen3.5:4b`) handles routine incidents. The agent escalates to **Claude Sonnet** only when rules in code say the incident is hard: an unknown type, low confidence, more than one independent root cause, an unseen signature, a failed fix, or invalid model output. Every step is logged with the model that actually answered, its tokens, latency and cost. Fixes go through an allowlist with risk tiers and human approval for risky actions, and are undone automatically if they make things worse. Recovery is declared only after a sustained healthy window. When an incident is resolved, the agent writes a runbook that a human must approve before it is reused. In 126 benchmark runs, hybrid routing matched the big-only agent's accuracy (100% correct and recovered on 6 fault scenarios, including one held out from tuning) at **39–44% lower cost**, with **0 invariant violations** and **0 false alarms**.
+I'adah is an AI agent that **detects, diagnoses, fixes and verifies recovery** of a failing system, including two faults at the same time. A **small local model** (Ollama `qwen3.5:4b`) handles routine incidents. The agent escalates to **Claude Sonnet** only when rules in code say the incident is hard: an unknown type, low confidence, more than one independent root cause, an unseen signature, a failed fix, or invalid model output. Every step is logged with the model that actually answered, its tokens, latency and cost. Fixes go through an allowlist with risk tiers and human approval for risky actions, and are undone automatically if they make things worse. Recovery is declared only after a sustained healthy window. When an incident is resolved, the agent writes a runbook that a human must approve before it is reused. In 126 benchmark runs, hybrid routing matched the big-only agent's accuracy (100% correct and recovered on 6 fault scenarios, including one held out from tuning) at **39–44% lower cost**, with **0 invariant violations** and **0 false alarms**. Two more held-out scenarios, designed by an independent agent, expose real gaps: one fault is invisible to detection, and one is misdiagnosed. In both, the agent fails safely and hands over to a human. An ablation shows which components carry the results.
 
 *Misk x HUMAIN hackathon, Challenge 1: Agentic Recovery of a Failing System.*
 
@@ -69,6 +69,14 @@ uv run python -m agent.run --scenario 1 --mode big-only --auto-approve
 | 4 | api scratch disk full |
 | 5 | Redis down **and** DB connection exhaustion (two independent root causes) |
 | 6 | **held out:** wrong `REDIS_HOST` after a deploy. No prompt or runbook was tuned for it |
+| 7 | **held out:** worker deployed with read-only DB credentials (designed by an independent agent) |
+| 8 | **held out:** forgotten migration holding a table lock (designed by an independent agent) |
+
+**Reproduce everything with one command:**
+```bash
+scripts/eval.sh quick    # fail-safe tests → smoke run → hybrid benchmark (n=1) → regression check vs committed v2
+scripts/eval.sh full     # same, all modes, n=3 (~4 h)
+```
 
 Other commands:
 ```bash
@@ -120,6 +128,41 @@ Each scenario was run 3 times in each mode (hybrid, big-only, small-only) and ea
 - **Hybrid warm misfires first, then recovers.** The small model calls it `cache_down@api`, so the cache runbook restarts the api. Verify catches that, the agent escalates, and Sonnet rolls back the config.
 - **The misfire was left unfixed on purpose:** fixing it would mean tuning on the held-out scenario.
 
+## Held-out results (scenarios 6–8)
+
+Scenarios 7 and 8 were designed and implemented (in `chaos.py`, with ground truth) by a **separate agent that never saw the prompts, runbooks or incident types**. It saw only `demo/`. Its ground truth is used as-is, and nothing in the agent was changed after seeing them. 3 runs per mode × condition; full tables in [`benchmarks/heldout/results.md`](benchmarks/heldout/results.md).
+
+| scenario | root | hybrid cold | hybrid warm | big-only cold | big-only warm | small-only cold | small-only warm |
+|---|---|---|---|---|---|---|---|
+| 6: wrong `REDIS_HOST` | api | **3/3** | **3/3** | **3/3** | **3/3** | 2/3 | 0/3 |
+| 7: read-only DB creds on worker | worker | 0/3 | 0/3 | 0/3 | 0/3 | 0/3 | 0/3 |
+| 8: migration holding a table lock | db | 0/3 | 0/3 | 0/3 | 0/3 | 0/3 | 0/3 |
+
+(correct & recovered / runs)
+
+**The agent fails both new scenarios, in every mode. It fails safely.**
+- **Scenario 7 is never detected (0/18).** The worker has no healthcheck or metrics, and the api stays healthy, so detection sees a healthy system and the agent does nothing. The only signals are in the worker log and the growing Redis queue, which detection doesn't read. This was already listed as a known limitation; the held-out scenario confirms it is a real blind spot.
+- **Scenario 8 is detected every time (MTTD ~3.5s) but misdiagnosed.** The models see api pool exhaustion and call it `db_pool_exhaustion@api`. The real root is a lock held on the db by a session idle in a transaction. The agent restarts the api, which can't release a lock held on the db, so verify fails and the agent **hands the incident to a human**. It makes no false recovery claim and takes no high-risk action. Cost: $0.02–0.06 per run with the big model, $0 for small-only.
+- **What generalises:** detection, the safety net (verify, caps, handover) and the cost profile. **What doesn't:** the incident vocabulary (no lock type) and detection coverage (no worker health). Both are vocabulary and observability gaps, not routing failures; big-only fails the same way hybrid does.
+- 6 runs were discarded because the Mac slept mid-run on battery, and they were rerun. 0 invariant violations, 0 errors.
+
+## Ablation results
+
+Hybrid, warm, scenarios 1–6, n=2, with one component switched off at a time (`benchmarks/run.py --ablate <x>`), against a full-hybrid baseline run in the same session. Full table: [`benchmarks/ablation/results.md`](benchmarks/ablation/results.md).
+
+| config | correct & recovered | false recoveries | MTTR s | tokens / run | cost / run | unnecessary actions / inc |
+|---|---|---|---|---|---|---|
+| **full hybrid** | **100%** | 0 | 75.5 | 5,194 | $0.0116 | 0.08 |
+| (a) no topology root/symptom guard | **75%** | 1 | 113.3 | 9,566 | $0.0273 | 0.25 |
+| (b) no log compression | 100% | 0 | 109.5 | 12,611 | $0.0149 | 0.17 |
+| (c) no fast path | 100% | 0 | 72.0 | 6,199 | $0.0106 | 0.00 |
+| (d) single-poll verify | 100% | 0 | 41.9 | 4,874 | $0.0101 | 0.00 |
+
+- **(a) The topology guard is the component that carries correctness.** Without it, scenario 2 fails 2/2: the diagnosis names the healthy db as the root, and nothing usable gets planned. Scenario 6 has one false recovery, where the agent declared the incident fixed but it wasn't healthy 10s later. Cost is 2.4× and MTTR +50%. The regression check flags this config on all three thresholds.
+- **(b) Log compression is a token and latency saving, not an accuracy one.** Raw logs take 2.4× the tokens, cost +28% and MTTR +45%, at the same accuracy.
+- **(c) The fast path showed no measurable benefit at n=2.** Warm scenarios 1–4 are already $0 on the small model with or without it. Its only unnecessary action was the known scenario 6 misfire. Its value is skipping the investigate step; on this suite that is within noise. Kept, but this is an honest null result.
+- **(d) Single-poll verify caused no false recoveries here, and cuts MTTR by ~34s.** The hybrid agent's diagnoses are right on these scenarios, so a quick poll happens to be true. The stable window was added because of v1, where single-poll verify produced *false* recoveries for the small model (see v1 → v2). It is insurance against a wrong diagnosis, and this ablation doesn't exercise that case. We pay ~34s of MTTR for it deliberately.
+
 ### v1 → v2 (scenarios 1–5, like for like)
 
 v1 was the first benchmark. A fresh review of v1 found leaked hints in the prompts, a single-poll verify, and a guard that silently rewrote wrong diagnoses. v2 fixes all three, and its numbers are lower but real.
@@ -158,12 +201,38 @@ Fail-safe tests (`tests/failsafe.py`, 5/5 pass):
 | Topology labels missing | Treats the incident as ambiguous, no fast path |
 | An action throws mid-plan | Undoes the plan's earlier actions |
 
+## Design decisions & trade-offs
+
+| Decision | Why | What it costs |
+|---|---|---|
+| **Routing by rules in code, not by a model** (`router/rules.py`) | Escalation is auditable: every route is logged with its reason, and it can be tested without a model | Thresholds are fixed, not learned. Confidence is the model's self-report. |
+| **Small local model first, Sonnet on escalation** | Routine incidents cost $0, and nothing leaves the machine | Wrong small-model triage costs a round trip before escalation (scenario 6 warm) |
+| **Topology guard rejects, never rewrites** | A diagnosis that names a healthy service or only symptoms is invalid output → retry, escalate, human. v1's silent rewrite hid wrong answers. | One extra model call when it fires. Ablation: removing it drops accuracy 100% → 75%. |
+| **Plain Python state machine, no agent framework** | Every stage is a function you can read, test and break on purpose (`tests/failsafe.py`) | More code of our own than a framework demo |
+| **Closed incident vocabulary + allowlisted actions** | Actions are bounded and reviewable; risk tiers and approvals attach to known actions | Unknown failure modes fall back to "unknown" → big model → often a human (scenarios 7–8) |
+| **Verify = 3 healthy polls over ≥20s + fault checks** | v1's single-poll verify reported false recoveries | ~34s more MTTR (ablation d) |
+| **Learned runbooks need human approval** | A wrong fix that "worked once" must not become automatic | The first run of a new signature always pays for the big model |
+| **Topology from container labels** | No hardcoded service names in the agent; a new system is configured, not coded | Wrong labels aren't detected (missing ones are) |
+| **Held-out scenarios graded, never tuned on** | The numbers stay honest | Scenarios 7–8 stay at 0% in this submission |
+
+## How this maps to the judging criteria
+
+| Criterion | Where to look |
+|---|---|
+| **Detect, diagnose, fix, verify, including multiple faults** | Scenarios 1–5 (5 = two independent roots): 100% correct & recovered for hybrid and big-only, [`benchmarks/results.md`](benchmarks/results.md) |
+| **Efficiency (cost, tokens, latency)** | Hybrid matches big-only at 39–44% lower cost. Per-step model, tokens, latency and cost in SQLite and on the dashboard. Ablation (b) shows log compression saves 2.4× tokens. |
+| **Performance on unseen cases** | [Held-out results](#held-out-results-scenarios-68): 6 passes; 7 and 8, designed by an independent agent, fail, and they fail safely (no false recovery, handover to a human) |
+| **Each component is justified** | [Ablation results](#ablation-results), including two honest nulls (fast path, single-poll verify) |
+| **Safety** | Allowlist, risk tiers, approvals, auto-undo, caps, invariants checked after every incident (0 violations in 222 benchmark runs), 0/18 false alarms on the control, fail-safe tests 5/5 |
+| **Reproducibility** | `scripts/eval.sh` runs fail-safe → smoke → benchmark → regression check against the committed v2 results (exit 1 on regression). Ground truth in `chaos.py`; every run logged. |
+| **Demo** | `uv run python -m dashboard.app`: live topology, routing badges, web approvals, learning loop, replay |
+
 ## Known limitations
-- **The incident vocabulary is small and maps closely onto scenarios 1–5** (only `slow_queries` is a decoy). Warm runs are close to scripted. Scenario 6 and the cold condition are the honest tests.
+- **The incident vocabulary is small and maps closely onto scenarios 1–5** (only `slow_queries` is a decoy). Warm runs are close to scripted. The held-out scenarios and the cold condition are the honest tests. There is no type for a lock or a long-running transaction, so scenario 8 is misdiagnosed as pool exhaustion.
 - **Runbooks are keyed by incident type, not by service.** A misclassified type runs that runbook on whichever service the model named. This caused the needless `restart(api)` on scenario 6.
 - **The 4B local model can't label DB connection exhaustion**, so scenario 5 always needs the big model to diagnose.
 - **The log error pattern includes `not known`,** added for scenario 1's DNS errors. It also highlights scenario 6's identical DNS error.
-- **The worker has no healthcheck or metrics.** Verify sees only that it's running and its memory use, not whether it is draining jobs.
+- **The worker has no healthcheck or metrics.** Detection and verify see only that it's running and its memory use, not whether it is draining jobs. Held-out scenario 7 is invisible because of this (0/18 detected).
 - **Live mode** (no `--scenario`) has no pre-fault baseline, so detection uses absolute thresholds only.
 - **Topology comes from container labels.** Missing labels are detected and force escalation; wrong labels are not detected.
 - **Confidence is the model's self-report**, gated by consistency with the topology. It is not calibrated.
@@ -172,7 +241,8 @@ Fail-safe tests (`tests/failsafe.py`, 5/5 pass):
 
 ## What's next
 - **Service-scoped runbooks** (type × service) and a runbook match check before the fast path, to remove the scenario 6 misfire class.
-- **A larger, open incident vocabulary**, plus a held-out suite of several unseen scenarios instead of one.
+- **A larger, open incident vocabulary** (locks and long transactions first, from scenario 8), plus a bigger held-out suite.
+- **Queue and job-rate signals for workers** (Redis backlog, job error logs) in detection, to close the scenario 7 blind spot.
 - **Kubernetes and Prometheus/Loki adapters** behind the same `Observability`/`Actions` interfaces.
 - **Calibrated routing:** learn escalation thresholds from telemetry (small-model accuracy per incident type) instead of fixed rules.
 - **A fine-tuned or larger local model** for the failure classes the 4B model misses (DB connection exhaustion, config errors).

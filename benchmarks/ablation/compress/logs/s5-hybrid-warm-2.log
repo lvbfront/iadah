@@ -1,0 +1,32 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.12}}; last-known-good 
+configs saved
+───────────────── inc-20261030-221702  scenario=5  mode=hybrid ─────────────────
+   5.8s inject       RULES              0.00s $0.00000   chaos scenario 5: redis down + DB connection exhaustion
+   5.8s detect       RULES              0.00s $0.00000   first alert {'db': 'status=unhealthy', 'cache': 'status=down'}; grouping for 3s
+   8.9s detect       RULES              0.05s $0.00000   unhealthy={'db': 'status=unhealthy', 'cache': 'status=down', 'api': 'error_rate=0.244 (baseline 0.0)'} → root suspects=['cache', 'db'] symptoms=['api']
+   9.0s compress     RULES              0.13s $0.00000   ['api', 'cache', 'db', 'traffic', 'worker']: 190 log lines → 190 templates; ~4717 → ~3243 tokens (1x smaller)
+  11.2s gather       RULES              2.14s $0.00000   3 parallel metric reads ['api', 'cache', 'db'] in code
+  41.1s triage       SMALL   8545→167  29.94s $0.00000  qwen3.5:4b roots=[('cache_down', 'cache'), ('db_pool_exhaustion', 'db')] conf=0.90 sev=critical
+  41.1s route        RULES              0.00s $0.00000   → big: 2 independent root causes
+  41.1s investigate  RULES              0.00s $0.00000   skipped: not ambiguous (conf 0.90), code-gathered evidence suffices
+  49.6s diagnose      BIG   10574→1021  8.43s $0.03136  claude-sonnet-5-5 roots=[('cache_down', 'cache'), ('db_pool_exhaustion', 'db')] conf=0.85 — Cache container exited after a SIGTERM and clean shutdown, so api and worker can (pack ~4044 tok)
+  49.7s plan         RULES              0.00s $0.00000   no runbook for ['cache_down', 'db_pool_exhaustion'] → asking planner model
+  52.1s plan          BIG    1654→149   2.42s $0.00480  claude-sonnet-5-5 proposed restart(cache), kill_idle_connections(db)
+  52.1s plan         RULES              0.00s $0.00000   model → dependency order: restart(cache) → kill_idle_connections(db)
+  52.3s act          RULES              0.14s $0.00000    restarted cache (1 replica(s))
+  57.6s verify-fix   RULES              5.32s $0.00000   cache is healthy
+  62.7s approve      HUMAN              0.00s $0.00000   kill_idle_connections(db) risk=high → auto-approved (--auto-approve)
+  62.8s act          RULES              0.07s $0.00000    terminated 25 idle connections on db
+  66.0s verify-fix   RULES              3.22s $0.00000   db is healthy
+  93.2s verify       RULES             22.17s $0.00000   recovered: 6 consecutive healthy polls over 20.9s, fault checks pass for ['cache_down@cache', 'db_pool_exhaustion@db']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.1, 'window_requests': 46}}
+  93.2s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-221702.md; runbook → cache_down+db_pool_exhaustion.learned.yaml (new, pending human review)
+                         RESOLVED  inc-20261030-221702                          
+┏━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃      ┃       ┃            ┃             ┃            ┃          ┃ log tokens ┃
+┃ MTTD ┃  MTTR ┃ iterations ┃ escalations ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 5.8s │ 93.1s │          1 │           1 │      22110 │ $0.03616 │  4717→3243 │
+└──────┴───────┴────────────┴─────────────┴────────────┴──────────┴────────────┘
+    BIG   claude-sonnet-5-5: 2 calls, 12228→1170 tok, 10.9s, $0.03616
+   SMALL  qwen3.5:4b: 1 calls, 8545→167 tok, 29.9s, $0.00000

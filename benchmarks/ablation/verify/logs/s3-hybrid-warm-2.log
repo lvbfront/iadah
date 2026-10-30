@@ -1,0 +1,27 @@
+system not healthy, running chaos reset…
+baseline {'api': {'error_rate': 0.0, 'avg_latency_ms': 9.8}}; last-known-good 
+configs saved
+───────────────── inc-20261030-225444  scenario=3  mode=hybrid ─────────────────
+   0.2s inject       RULES              0.00s $0.00000   chaos scenario 3: worker memory leak
+  21.9s detect       RULES              0.00s $0.00000   first alert {'worker': 'memory=76.3% of limit'}; grouping for 3s
+  25.0s detect       RULES              0.08s $0.00000   unhealthy={'worker': 'memory=85.7% of limit'} → root suspects=['worker'] symptoms=[]
+  25.0s compress     RULES              0.05s $0.00000   ['worker']: 2 log lines → 1 templates; ~42 → ~10 tokens (4x smaller)
+  27.2s gather       RULES              2.10s $0.00000   3 parallel metric reads ['cache', 'db', 'worker'] in code
+  32.8s triage       SMALL   1047→110   5.65s $0.00000  qwen3.5:4b roots=[('memory_leak', 'worker')] conf=0.90 sev=medium
+  32.8s route        RULES              0.00s $0.00000   → small: routine: known type, confidence 0.90
+  32.8s fast-path    RULES              0.00s $0.00000   fast path: conf 0.90 ≥ 0.85 + runbook for ['memory_leak'] → skip investigate/diagnose
+  32.9s plan         RULES              0.00s $0.00000   runbook:memory_leak → dependency order: restart(worker) → scale(worker)
+  33.3s act          RULES              0.38s $0.00000    restarted worker (1 replica(s))
+  33.4s verify-fix   RULES              0.04s $0.00000   worker is running
+  38.8s act          RULES              0.35s $0.00000    scaled worker 1 → 2 replicas
+  38.9s verify-fix   RULES              0.04s $0.00000   worker is running
+  44.2s verify       RULES              0.21s $0.00000   recovered: 1 consecutive healthy polls over 0.0s, fault checks pass for ['memory_leak@worker']; {'api': {'error_rate': 0.0, 'avg_latency_ms': 8.9, 'window_requests': 46}}
+  44.2s postmortem   RULES              0.00s $0.00000   report → reports/inc-20261030-225444.md; runbook → memory_leak.yaml (times_used=1)
+                         RESOLVED  inc-20261030-225444                          
+┏━━━━━━━┳━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━━━┓
+┃       ┃       ┃            ┃            ┃            ┃          ┃ log tokens ┃
+┃  MTTD ┃  MTTR ┃ iterations ┃ escalatio… ┃ LLM tokens ┃     cost ┃ raw→compr… ┃
+┡━━━━━━━╇━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━━━┩
+│ 21.9s │ 44.0s │          1 │          0 │       1157 │ $0.00000 │      42→10 │
+└───────┴───────┴────────────┴────────────┴────────────┴──────────┴────────────┘
+   SMALL  qwen3.5:4b: 1 calls, 1047→110 tok, 5.7s, $0.00000
