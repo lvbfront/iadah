@@ -178,3 +178,6 @@ Fail-safe tests (`tests/failsafe.py`, 5/5 pass):
 - **A fine-tuned or larger local model** for the failure classes the 4B model misses (DB connection exhaustion, config errors).
 - **Change awareness:** correlate faults with recent deploys and config diffs, to explain the root cause and not only fix it.
 - **Approvals via Slack/Teams**, behind the same pluggable approval provider the dashboard uses.
+
+## License
+MIT, see [LICENSE](LICENSE).
