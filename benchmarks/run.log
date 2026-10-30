@@ -34,7 +34,7 @@
 [33/126] s5-big-only-cold-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=71.4 $0.03239 106s 
 [34/126] s5-big-only-warm-1: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=66.9 $0.02872 102s 
 [35/126] s5-small-only-cold-1: resolved=0 diag=0 (db_pool_exhaustion@db) mttr= $0.0 317s 
-[36/126] s5-small-only-warm-1: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[36/126] s5-small-only-warm-1: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
 [37/126] s6-hybrid-cold-1: resolved=1 diag=1 (cache_down@api) mttr=57.7 $0.01669 92s 
 [38/126] s6-hybrid-warm-1: resolved=1 diag=1 (cache_down@api) mttr=193.7 $0.03825 228s 
 [39/126] s6-big-only-cold-1: resolved=1 diag=1 (unknown@api) mttr=53.6 $0.02822 88s 
@@ -77,9 +77,9 @@
 [76/126] s5-big-only-warm-2: resolved=1 diag=1 (cache_down@cache;db_pool_exhaustion@db) mttr=69.0 $0.02974 104s 
 [77/126] s5-small-only-cold-2: resolved=1 diag=0 (cache_down@cache;slow_queries@db) mttr=100.7 $0.0 136s 
 [78/126] s5-small-only-warm-2: resolved=0 diag=0 (db_pool_exhaustion@db) mttr= $0.0 188s 
-[79/126] s6-hybrid-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
-[80/126] s6-hybrid-warm-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
-[81/126] s6-big-only-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[79/126] s6-hybrid-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[80/126] s6-hybrid-warm-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+[81/126] s6-big-only-cold-2: resolved=0 diag=0 () mttr= $ 1s CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
 [82/126] s6-big-only-warm-2: resolved=1 diag=1 (cache_down@api) mttr=192.4 $0.05134 227s 
 [83/126] s6-small-only-cold-2: resolved=0 diag=0 (none) mttr= $0.0 60s 
 [84/126] s6-small-only-warm-2: resolved=0 diag=1 (cache_down@api) mttr= $0.0 418s 
@@ -202,7 +202,7 @@
 | s2-small-only-cold-1 | none | db_auth_failure@api | 0 |  |  |
 | s2-small-only-warm-1 | none | db_auth_failure@api | 0 |  |  |
 | s5-small-only-cold-1 | db_pool_exhaustion@db | cache_down@cache;db_pool_exhaustion@db | 0 | restart(cache) |  |
-| s5-small-only-warm-1 |  | cache_down@cache;db_pool_exhaustion@db | 0 |  | CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1. |
+| s5-small-only-warm-1 |  | cache_down@cache;db_pool_exhaustion@db | 0 |  | CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1. |
 | s6-small-only-warm-1 | cache_down@api | *@api | 0 | restart(api) |  |
 | s2-small-only-cold-2 | none | db_auth_failure@api | 0 |  |  |
 | s2-small-only-warm-2 | none | db_auth_failure@api | 0 |  |  |
@@ -219,10 +219,10 @@
 ## Invariant violations: 0
 
 ## Errors: 4
-- s5-small-only-warm-1: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
-- s6-hybrid-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
-- s6-hybrid-warm-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
-- s6-big-only-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', '/Users/awb/Developer/recovery-agent/demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s5-small-only-warm-1: CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-hybrid-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-hybrid-warm-2: CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
+- s6-big-only-cold-2: CalledProcessError: Command '['docker', 'compose', '-f', 'demo/docker-compose.yml', 'up', '-d', '--scale', 'worker=1']' returned non-zero exit status 1.
 4 runs to do (122 already done)
 [1/4] s5-small-only-warm-1: resolved=0 diag=0 (cache_down@cache;slow_queries@db) mttr= $0.0 62s 
 [2/4] s6-hybrid-cold-2: resolved=1 diag=1 (cache_down@api) mttr=61.1 $0.01958 96s 

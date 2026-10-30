@@ -9,3 +9,7 @@ reports/
 .state/
 benchmarks/logs/
 benchmarks/telemetry.db
+*.db
+*.sqlite
+.idea/
+.vscode/
